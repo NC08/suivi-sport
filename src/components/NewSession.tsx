@@ -4,6 +4,7 @@ import { SESSION_TYPE_LABELS, SUGGESTED_EXERCISES, SESSION_METRICS, METRIC_LABEL
 import { addSession, updateSession, generateId } from '../utils/storage';
 import { Plus, Trash2, ChevronDown, ChevronUp, X } from 'lucide-react';
 import CardioForm from './CardioForm';
+import MuscuForm from './MuscuForm';
 import clsx from 'clsx';
 
 interface Props {
@@ -35,14 +36,16 @@ export default function NewSession({ editing, onSaved, onCancel }: Props) {
 
   const type = session.type;
   const isCardio = type === 'cardio';
+  const isMusculation = type === 'musculation';
   const metrics = SESSION_METRICS[type];
   const patch = (p: Partial<Session>) => setSession(s => ({ ...s, ...p }));
 
   const handleTypeChange = (t: SessionType) => {
     setSession(s => ({
       ...s, type: t,
-      exercises: t === 'cardio' ? [] : [emptyExercise()],
+      exercises: (t === 'cardio' || t === 'musculation') ? [] : [emptyExercise()],
       cardioBlocs: undefined,
+      muscuItems: undefined,
     }));
   };
 
@@ -77,7 +80,7 @@ export default function NewSession({ editing, onSaved, onCancel }: Props) {
       ...session,
       title: session.title || undefined,
       notes: session.notes || undefined,
-      exercises: isCardio ? [] : session.exercises.filter(e => e.name.trim()),
+      exercises: (isCardio || isMusculation) ? [] : session.exercises.filter(e => e.name.trim()),
     };
     editing ? updateSession(toSave) : addSession(toSave);
     onSaved();
@@ -85,6 +88,8 @@ export default function NewSession({ editing, onSaved, onCancel }: Props) {
 
   const canSave = isCardio
     ? (session.cardioBlocs?.some(b => b.intervals.length > 0) ?? false) || !!session.warmupDuration
+    : isMusculation
+    ? (session.muscuItems?.some(i => i.itemType === 'exercise' ? i.name.trim() : i.exercises.some(e => e.name.trim())) ?? false)
     : session.exercises.some(e => e.name.trim());
 
   return (
@@ -127,6 +132,8 @@ export default function NewSession({ editing, onSaved, onCancel }: Props) {
 
       {isCardio ? (
         <CardioForm session={session} onChange={patch} />
+      ) : isMusculation ? (
+        <MuscuForm session={session} onChange={patch} />
       ) : (
         <div className="space-y-3">
           <h2 className="text-sm font-semibold text-gray-700">Exercices ({session.exercises.length})</h2>
