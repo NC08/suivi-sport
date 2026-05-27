@@ -21,20 +21,19 @@ export interface CardioInterval {
   wattsStart?: number;
   wattsEnd?: number;
   position?: 'normal' | 'danseuse';
-  danseuseDuration?: number;  // seconds in danseuse position
-  recoveryAfter?: number;     // minutes of recovery after this interval
-  isAvgBlock?: boolean;       // "5mins moy 83rpm 95watt" type block
-  avgDuration?: number;       // minutes (for avg blocks)
+  danseuseDuration?: number;
+  recoveryAfter?: number;
+  isAvgBlock?: boolean;
+  avgDuration?: number;
   avgRpm?: number;
   avgWatts?: number;
   notes?: string;
 }
 
-// One bloc = group of intervals + optional recovery after the bloc
 export interface CardioBloc {
   id: string;
   intervals: CardioInterval[];
-  recoveryAfter?: number;  // minutes between this bloc and next
+  recoveryAfter?: number;
 }
 
 export interface Exercise {
@@ -47,13 +46,70 @@ export interface Exercise {
   recoveryAfter?: number;
 }
 
+// ── Musculation types ──────────────────────────────────────────
+
+export interface MuscuSet {
+  setNumber: number;
+  weight?: number;
+  targetReps?: number;
+  actualReps?: number;
+}
+
+export interface MuscuExercise {
+  id: string;
+  itemType: 'exercise';
+  name: string;
+  sets: MuscuSet[];
+  recoveryAfter?: number;
+  recoveryIsAvg?: boolean;
+  variation?: string;
+  notes?: string;
+}
+
+export interface SupersetExercise {
+  id: string;
+  name: string;
+  weight?: number;
+  targetReps?: number;
+  actualRepsByRound?: (number | undefined)[];
+  variation?: string;
+  notes?: string;
+}
+
+export interface MuscuSuperset {
+  id: string;
+  itemType: 'superset';
+  exercises: SupersetExercise[];
+  rounds: number;
+  recoveryAfter?: number;
+  recoveryIsAvg?: boolean;
+  notes?: string;
+}
+
+export type MuscuItem = MuscuExercise | MuscuSuperset;
+
+export const MUSCU_VARIATIONS = ['Sans banc', 'Avec banc', 'Debout', 'Assis', 'Incliné', 'Décliné', 'Prise large', 'Prise serrée', 'Unilatéral', 'Pronation', 'Supination'];
+
+export const MUSCU_EXERCISES = [
+  'Traction lestée', 'Traction', 'Tirage horizontal allongé', 'Tirage poulie verticale',
+  'Poulie', 'Curl marteau', 'Curl biceps', 'Curl haltères',
+  'Développé couché', 'Développé militaire', 'Développé haltères',
+  'Squat', 'Squat haltères', 'Leg press', 'Fentes', 'Soulevé de terre',
+  'Hip thrust', 'Rowing barre', 'Rowing haltères', 'Face pull',
+  'Dips', 'Triceps poulie', 'Triceps haltères',
+  'Shrug', 'Élévations latérales', 'Élévations frontales',
+  'Gainage', 'Crunch', 'Ab wheel',
+];
+
+// ── Session ────────────────────────────────────────────────────
+
 export interface Session {
   id: string;
   type: SessionType;
   date: string;
   title?: string;
   exercises: Exercise[];
-  totalDuration?: number;   // minutes
+  totalDuration?: number;
   notes?: string;
   createdAt: string;
   // Cardio-specific
@@ -61,6 +117,8 @@ export interface Session {
   cooldownDuration?: number;
   cardioBlocs?: CardioBloc[];
   machine?: string;
+  // Musculation-specific
+  muscuItems?: MuscuItem[];
 }
 
 export const SESSION_TYPE_LABELS: Record<SessionType, string> = {
@@ -93,7 +151,7 @@ export const SESSION_TYPE_GRADIENT: Record<SessionType, string> = {
 
 export const SUGGESTED_EXERCISES: Record<SessionType, string[]> = {
   cardio: ['Vélo', 'Course à pied', 'Rameur', 'Corde à sauter', 'Elliptique', 'Natation', 'Ski erg'],
-  musculation: ['Squat', 'Développé couché', 'Soulevé de terre', 'Tractions', 'Dips', 'Curl biceps', 'Presse à cuisses', 'Rowing barre', 'Développé militaire', 'Leg press'],
+  musculation: MUSCU_EXERCISES,
   hyrox: ['SkiErg', 'Sled Push', 'Sled Pull', 'Burpee Broad Jump', 'Rowing', 'Farmers Carry', 'Sandbag Lunges', 'Wall Balls', 'Run 1km'],
   crosstraining: ['Thrusters', 'Box Jumps', 'Kettlebell Swing', 'Double Under', 'Muscle Up', 'Handstand Push Up', 'Toes to Bar', 'Power Clean', 'Wall Walk', 'Assault Bike'],
 };
