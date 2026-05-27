@@ -5,6 +5,7 @@ import { addSession, updateSession, generateId } from '../utils/storage';
 import { Plus, Trash2, ChevronDown, ChevronUp, X } from 'lucide-react';
 import CardioForm from './CardioForm';
 import MuscuForm from './MuscuForm';
+import CrossTrainingForm, { CTExerciseDatalist } from './CrossTrainingForm';
 import clsx from 'clsx';
 
 interface Props {
@@ -37,15 +38,18 @@ export default function NewSession({ editing, onSaved, onCancel }: Props) {
   const type = session.type;
   const isCardio = type === 'cardio';
   const isMusculation = type === 'musculation';
+  const isCrossTraining = type === 'crosstraining';
   const metrics = SESSION_METRICS[type];
   const patch = (p: Partial<Session>) => setSession(s => ({ ...s, ...p }));
 
   const handleTypeChange = (t: SessionType) => {
     setSession(s => ({
       ...s, type: t,
-      exercises: (t === 'cardio' || t === 'musculation') ? [] : [emptyExercise()],
+      exercises: (t === 'cardio' || t === 'musculation' || t === 'crosstraining') ? [] : [emptyExercise()],
       cardioBlocs: undefined,
       muscuItems: undefined,
+      ctBlocs: undefined,
+      warmupDone: undefined,
     }));
   };
 
@@ -80,7 +84,7 @@ export default function NewSession({ editing, onSaved, onCancel }: Props) {
       ...session,
       title: session.title || undefined,
       notes: session.notes || undefined,
-      exercises: (isCardio || isMusculation) ? [] : session.exercises.filter(e => e.name.trim()),
+      exercises: (isCardio || isMusculation || isCrossTraining) ? [] : session.exercises.filter(e => e.name.trim()),
     };
     editing ? updateSession(toSave) : addSession(toSave);
     onSaved();
@@ -90,6 +94,12 @@ export default function NewSession({ editing, onSaved, onCancel }: Props) {
     ? (session.cardioBlocs?.some(b => b.intervals.length > 0) ?? false) || !!session.warmupDuration
     : isMusculation
     ? (session.muscuItems?.some(i => i.itemType === 'exercise' ? i.name.trim() : i.exercises.some(e => e.name.trim())) ?? false)
+    : isCrossTraining
+    ? (session.ctBlocs?.some(b =>
+        b.blocType === 'forTime' ? b.exerciseName.trim() !== '' :
+        b.blocType === 'amrap' ? b.exercises.some(e => e.name.trim()) :
+        b.exercises.some(e => e.name.trim())
+      ) ?? false) || !!session.warmupDone
     : session.exercises.some(e => e.name.trim());
 
   return (
@@ -130,10 +140,14 @@ export default function NewSession({ editing, onSaved, onCancel }: Props) {
         </div>
       </div>
 
+      <CTExerciseDatalist />
+
       {isCardio ? (
         <CardioForm session={session} onChange={patch} />
       ) : isMusculation ? (
         <MuscuForm session={session} onChange={patch} />
+      ) : isCrossTraining ? (
+        <CrossTrainingForm session={session} onChange={patch} />
       ) : (
         <div className="space-y-3">
           <h2 className="text-sm font-semibold text-gray-700">Exercices ({session.exercises.length})</h2>
