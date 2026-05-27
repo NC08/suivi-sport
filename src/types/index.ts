@@ -2,34 +2,65 @@ export type SessionType = 'cardio' | 'musculation' | 'hyrox' | 'crosstraining';
 
 export interface ExerciseSet {
   setNumber: number;
-  weight?: number;       // kg
+  weight?: number;
   reps?: number;
-  duration?: number;     // seconds
-  distance?: number;     // meters
+  duration?: number;      // seconds
+  distance?: number;      // meters
   rpm?: number;
-  heartRate?: number;    // bpm
+  heartRate?: number;
   calories?: number;
   notes?: string;
+}
+
+// One interval within a cardio bloc
+export interface CardioInterval {
+  id: string;
+  niveau?: number;
+  rpmStart?: number;
+  rpmEnd?: number;
+  wattsStart?: number;
+  wattsEnd?: number;
+  position?: 'normal' | 'danseuse';
+  danseuseDuration?: number;  // seconds in danseuse position
+  recoveryAfter?: number;     // minutes of recovery after this interval
+  isAvgBlock?: boolean;       // "5mins moy 83rpm 95watt" type block
+  avgDuration?: number;       // minutes (for avg blocks)
+  avgRpm?: number;
+  avgWatts?: number;
+  notes?: string;
+}
+
+// One bloc = group of intervals + optional recovery after the bloc
+export interface CardioBloc {
+  id: string;
+  intervals: CardioInterval[];
+  recoveryAfter?: number;  // minutes between this bloc and next
 }
 
 export interface Exercise {
   id: string;
   name: string;
   sets: ExerciseSet[];
-  totalDuration?: number;  // seconds — for timed exercises
-  totalDistance?: number;  // meters
+  totalDuration?: number;
+  totalDistance?: number;
   notes?: string;
+  recoveryAfter?: number;
 }
 
 export interface Session {
   id: string;
   type: SessionType;
-  date: string;           // ISO date string
+  date: string;
   title?: string;
   exercises: Exercise[];
-  totalDuration?: number; // minutes
+  totalDuration?: number;   // minutes
   notes?: string;
   createdAt: string;
+  // Cardio-specific
+  warmupDuration?: number;
+  cooldownDuration?: number;
+  cardioBlocs?: CardioBloc[];
+  machine?: string;
 }
 
 export const SESSION_TYPE_LABELS: Record<SessionType, string> = {
@@ -60,13 +91,14 @@ export const SESSION_TYPE_GRADIENT: Record<SessionType, string> = {
   crosstraining: 'from-amber-500 to-amber-600',
 };
 
-// Suggested exercises per session type (extensible)
 export const SUGGESTED_EXERCISES: Record<SessionType, string[]> = {
-  cardio: ['Course à pied', 'Vélo', 'Rameur', 'Corde à sauter', 'Elliptique', 'Natation', 'Ski erg'],
+  cardio: ['Vélo', 'Course à pied', 'Rameur', 'Corde à sauter', 'Elliptique', 'Natation', 'Ski erg'],
   musculation: ['Squat', 'Développé couché', 'Soulevé de terre', 'Tractions', 'Dips', 'Curl biceps', 'Presse à cuisses', 'Rowing barre', 'Développé militaire', 'Leg press'],
   hyrox: ['SkiErg', 'Sled Push', 'Sled Pull', 'Burpee Broad Jump', 'Rowing', 'Farmers Carry', 'Sandbag Lunges', 'Wall Balls', 'Run 1km'],
   crosstraining: ['Thrusters', 'Box Jumps', 'Kettlebell Swing', 'Double Under', 'Muscle Up', 'Handstand Push Up', 'Toes to Bar', 'Power Clean', 'Wall Walk', 'Assault Bike'],
 };
+
+export const CARDIO_MACHINES = ['Vélo', 'Rameur', 'Tapis de course', 'Elliptique', 'Ski Erg', 'Assault Bike'];
 
 export type MetricKey = 'weight' | 'reps' | 'duration' | 'distance' | 'rpm' | 'heartRate' | 'calories';
 
@@ -90,7 +122,6 @@ export const METRIC_UNITS: Record<MetricKey, string> = {
   calories: 'kcal',
 };
 
-// Which metrics are relevant per session type (default suggestion)
 export const SESSION_METRICS: Record<SessionType, MetricKey[]> = {
   cardio: ['duration', 'distance', 'heartRate', 'calories', 'rpm'],
   musculation: ['weight', 'reps', 'duration'],
