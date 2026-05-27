@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Session, SessionType, MetricKey, CardioBloc, MuscuItem, CTBloc } from '../types';
+import type { Session, SessionType, MetricKey, CardioBloc, MuscuItem, CTBloc, CTEmomBloc, CTDeathByBloc } from '../types';
 import { SESSION_TYPE_LABELS, METRIC_UNITS } from '../types';
 import { deleteSession } from '../utils/storage';
 import { format, parseISO } from 'date-fns';
@@ -263,22 +263,45 @@ function CTDetail({ session }: { session: Session }) {
       {session.warmupDone && <p className="text-xs text-gray-500">✓ Warm-up effectué</p>}
       {blocs.map((bloc, bi) => {
         if (bloc.blocType === 'forTime') {
+          const isStructured = bloc.segmentInterval !== undefined && (bloc.segmentTimes?.length ?? 0) > 0;
+          const totalSeg = (bloc.segmentTimes ?? []).reduce((s, t) => s + (t ?? 0), 0);
           return (
             <div key={bloc.id} className="bg-amber-50 rounded-xl p-3 space-y-2">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-bold text-amber-700">Bloc {bi + 1} · For Time — {bloc.exerciseName}</span>
-                {bloc.finalTime !== undefined && <span className="font-mono font-semibold text-amber-600">{secsToMmss(bloc.finalTime)}</span>}
+                {isStructured && totalSeg > 0
+                  ? <span className="font-mono font-semibold text-amber-600">{secsToMmss(totalSeg)}</span>
+                  : bloc.finalTime !== undefined && <span className="font-mono font-semibold text-amber-600">{secsToMmss(bloc.finalTime)}</span>}
               </div>
               {bloc.targetReps !== undefined && <p className="text-xs text-gray-500">Cible : {bloc.targetReps} reps</p>}
-              {bloc.breaks.length > 0 && (
+              {isStructured ? (
                 <table className="text-xs w-full">
-                  <thead>
-                    <tr className="text-gray-400">
-                      <th className="text-left pb-1 font-medium">Break</th>
-                      <th className="text-right pb-1 font-medium">Reps</th>
-                      <th className="text-right pb-1 font-medium">Prise</th>
-                    </tr>
-                  </thead>
+                  <thead><tr className="text-gray-400">
+                    <th className="text-left pb-1 font-medium">Segment</th>
+                    <th className="text-left pb-1 font-medium">Reps</th>
+                    <th className="text-right pb-1 font-medium">Temps</th>
+                  </tr></thead>
+                  <tbody>
+                    {(bloc.segmentTimes ?? []).map((t, i) => {
+                      const start = i * (bloc.segmentInterval ?? 0) + 1;
+                      const end = Math.min((i + 1) * (bloc.segmentInterval ?? 0), bloc.targetReps ?? 0);
+                      return (
+                        <tr key={i} className="border-t border-amber-100">
+                          <td className="py-1 text-gray-400">{i + 1}</td>
+                          <td className="py-1 text-gray-600">{start}→{end}</td>
+                          <td className="py-1 text-right font-mono font-medium text-gray-700">{secsToMmss(t ?? 0)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              ) : bloc.breaks.length > 0 ? (
+                <table className="text-xs w-full">
+                  <thead><tr className="text-gray-400">
+                    <th className="text-left pb-1 font-medium">Break</th>
+                    <th className="text-right pb-1 font-medium">Reps</th>
+                    <th className="text-right pb-1 font-medium">Prise</th>
+                  </tr></thead>
                   <tbody>
                     {bloc.breaks.map((b, i) => (
                       <tr key={i} className="border-t border-amber-100">
@@ -294,16 +317,16 @@ function CTDetail({ session }: { session: Session }) {
                     </tr>
                   </tbody>
                 </table>
-              )}
+              ) : null}
               {bloc.penaltyDesc && <p className="text-xs text-gray-400">Pénalité : {bloc.penaltyDesc}{bloc.penaltyRounds ? ` × ${bloc.penaltyRounds}` : ''}</p>}
               {bloc.recoveryAfter && <p className="text-xs text-gray-400">Récup : {bloc.recoveryAfter} min</p>}
             </div>
           );
         }
+
         if (bloc.blocType === 'amrap') {
           const score = bloc.roundsCompleted !== undefined
-            ? `${bloc.roundsCompleted} rounds${bloc.partialRoundExercises ? ` + ${bloc.partialRoundExercises} ex.` : ''}`
-            : null;
+            ? `${bloc.roundsCompleted} rounds${bloc.partialRoundExercises ? ` + ${bloc.partialRoundExercises} ex.` : ''}` : null;
           return (
             <div key={bloc.id} className="bg-amber-50 rounded-xl p-3 space-y-2">
               <div className="flex items-center justify-between text-xs">
@@ -323,10 +346,85 @@ function CTDetail({ session }: { session: Session }) {
             </div>
           );
         }
+
+        if (bloc.blocType === 'emom') {
+          const emom = bloc as CTEmomBloc;
+          const rounds = emom.exercises.length > 0 && emom.totalMinutes > 0
+            ? Math.floor(emom.totalMinutes / emom.exercises.length) : 0;
+          return (
+            <div key={bloc.id} className="bg-amber-50 rounded-xl p-3 space-y-2">
+              <div className="text-xs font-bold text-amber-700">
+                Bloc {bi + 1} · EMOM {emom.totalMinutes} min{rounds > 0 ? ` · ${rounds} rounds` : ''}
+              </div>
+              {emom.exercises.map((ex, ei) => (
+                <div key={ex.id} className="border-t border-amber-100 pt-2 first:border-0 first:pt-0">
+                  {ex.isRest ? (
+                    <span className="text-xs text-gray-400 italic">Min {ei + 1} : REST</span>
+                  ) : (
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-gray-400 shrink-0">Min {ei + 1}</span>
+                        <span className="font-medium text-gray-700">{ex.name}</span>
+                        {(ex.targetRepsMin !== undefined || ex.targetRepsMax !== undefined) && (
+                          <span className="text-gray-400">({ex.targetRepsMin ?? '?'}-{ex.targetRepsMax ?? '?'} reps)</span>
+                        )}
+                      </div>
+                      {(ex.actualReps ?? []).some(r => r !== undefined) && (
+                        <div className="flex gap-1 flex-wrap">
+                          {(ex.actualReps ?? []).map((r, ri) => (
+                            <span key={ri} className="text-xs px-2 py-0.5 bg-white rounded-lg text-gray-700 font-medium">
+                              R{ri + 1}: {r ?? '—'}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          );
+        }
+
+        if (bloc.blocType === 'deathBy') {
+          const db = bloc as CTDeathByBloc;
+          return (
+            <div key={bloc.id} className="bg-amber-50 rounded-xl p-3 space-y-3">
+              <div className="text-xs font-bold text-amber-700">
+                Bloc {bi + 1} · Death by{db.recoveryBetween ? ` · récup ${db.recoveryBetween} min entre machines` : ''}
+              </div>
+              {db.blocks.map((block, bki) => (
+                <div key={block.id} className="border-t border-amber-100 pt-2 first:border-0 first:pt-0">
+                  <p className="text-xs font-semibold text-gray-600 mb-1">{block.machine ?? `Machine ${bki + 1}`}</p>
+                  <table className="text-xs w-full">
+                    <thead><tr className="text-gray-400">
+                      <th className="text-left pb-1">#</th>
+                      <th className="text-center pb-1">Effort / Récup</th>
+                      <th className="text-right pb-1">Watts moy</th>
+                      <th className="text-right pb-1">RPM moy</th>
+                    </tr></thead>
+                    <tbody>
+                      {block.intervals.map((iv, ii) => (
+                        <tr key={ii} className="border-t border-amber-100">
+                          <td className="py-1 text-gray-400">{ii + 1}</td>
+                          <td className="py-1 text-center text-gray-500">{iv.effortSecs}'' / {iv.restSecs}''</td>
+                          <td className="py-1 text-right font-medium text-gray-700">{iv.avgWatts ?? '—'}</td>
+                          <td className="py-1 text-right text-gray-600">{iv.avgRpm ?? '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
+            </div>
+          );
+        }
+
+        // finisher
         return (
           <div key={bloc.id} className="bg-amber-50 rounded-xl p-3 space-y-2">
             <div className="flex items-center justify-between text-xs">
-              <span className="font-bold text-amber-700">Bloc {bi + 1} · Finisher</span>
+              <span className="font-bold text-amber-700">Bloc {bi + 1} · {bloc.label ?? 'Finisher'}</span>
               {bloc.finalTime !== undefined && <span className="font-mono font-semibold text-amber-600">{secsToMmss(bloc.finalTime)}</span>}
             </div>
             <div className="space-y-1">

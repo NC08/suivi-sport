@@ -98,6 +98,8 @@ export default function NewSession({ editing, onSaved, onCancel }: Props) {
     ? (session.ctBlocs?.some(b =>
         b.blocType === 'forTime' ? b.exerciseName.trim() !== '' :
         b.blocType === 'amrap' ? b.exercises.some(e => e.name.trim()) :
+        b.blocType === 'emom' ? b.exercises.some(e => !e.isRest && e.name.trim()) :
+        b.blocType === 'deathBy' ? b.blocks.length > 0 :
         b.exercises.some(e => e.name.trim())
       ) ?? false) || !!session.warmupDone
     : session.exercises.some(e => e.name.trim());

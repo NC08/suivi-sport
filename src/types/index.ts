@@ -117,6 +117,8 @@ export interface CTForTimeBloc {
   targetReps?: number;
   penaltyDesc?: string;
   penaltyRounds?: number;
+  segmentInterval?: number;
+  segmentTimes?: number[];
   breaks: CTBreak[];
   finalTime?: number;
   recoveryAfter?: string;
@@ -157,10 +159,50 @@ export interface CTFinisherBloc {
   blocType: 'finisher';
   exercises: CTFinisherExercise[];
   finalTime?: number;
+  label?: string;
   notes?: string;
 }
 
-export type CTBloc = CTForTimeBloc | CTAmrapBloc | CTFinisherBloc;
+export interface CTEmomExercise {
+  id: string;
+  name: string;
+  isRest?: boolean;
+  targetRepsMin?: number;
+  targetRepsMax?: number;
+  actualReps: (number | undefined)[];
+  notes?: string;
+}
+
+export interface CTEmomBloc {
+  id: string;
+  blocType: 'emom';
+  totalMinutes: number;
+  exercises: CTEmomExercise[];
+  notes?: string;
+}
+
+export interface CTDeathByInterval {
+  effortSecs: number;
+  restSecs: number;
+  avgWatts?: number;
+  avgRpm?: number;
+}
+
+export interface CTDeathByBlock {
+  id: string;
+  machine?: string;
+  intervals: CTDeathByInterval[];
+}
+
+export interface CTDeathByBloc {
+  id: string;
+  blocType: 'deathBy';
+  blocks: CTDeathByBlock[];
+  recoveryBetween?: number;
+  notes?: string;
+}
+
+export type CTBloc = CTForTimeBloc | CTAmrapBloc | CTFinisherBloc | CTEmomBloc | CTDeathByBloc;
 
 export const CT_EXERCISES = [
   'Tractions', 'Tractions lestées', 'Push-ups', 'Burpees', 'Squats', 'Jump squat',
