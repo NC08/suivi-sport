@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { Session } from './types';
-import { loadSessions, saveSessions } from './utils/storage';
-import { generateSeedData } from './utils/seedData';
+import { loadSessions } from './utils/storage';
 import Navigation from './components/Navigation';
 import Dashboard from './components/Dashboard';
 import NewSession from './components/NewSession';
@@ -16,12 +15,7 @@ export default function App() {
   const [editingSession, setEditingSession] = useState<Session | null>(null);
 
   useEffect(() => {
-    let stored = loadSessions();
-    if (stored.length === 0) {
-      stored = generateSeedData();
-      saveSessions(stored);
-    }
-    setSessions(stored);
+    setSessions(loadSessions());
   }, []);
 
   const refresh = () => setSessions(loadSessions());
