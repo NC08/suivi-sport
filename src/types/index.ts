@@ -101,6 +101,76 @@ export const MUSCU_EXERCISES = [
   'Gainage', 'Crunch', 'Ab wheel',
 ];
 
+// ── Cross-Training types ───────────────────────────────────────
+
+export type CTGrip = 'pronation' | 'supination' | 'neutre';
+
+export interface CTBreak {
+  repsDone: number;
+  grip?: CTGrip;
+}
+
+export interface CTForTimeBloc {
+  id: string;
+  blocType: 'forTime';
+  exerciseName: string;
+  targetReps?: number;
+  penaltyDesc?: string;
+  penaltyRounds?: number;
+  breaks: CTBreak[];
+  finalTime?: number;
+  recoveryAfter?: string;
+  notes?: string;
+}
+
+export interface CTAmrapExercise {
+  id: string;
+  name: string;
+  targetReps?: number;
+  targetCals?: number;
+  weight?: number;
+  notes?: string;
+}
+
+export interface CTAmrapBloc {
+  id: string;
+  blocType: 'amrap';
+  exercises: CTAmrapExercise[];
+  duration?: number;
+  roundsCompleted?: number;
+  partialRoundExercises?: number;
+  recoveryAfter?: string;
+  notes?: string;
+}
+
+export interface CTFinisherExercise {
+  id: string;
+  name: string;
+  targetReps?: number;
+  weight?: number;
+  variant?: string;
+  notes?: string;
+}
+
+export interface CTFinisherBloc {
+  id: string;
+  blocType: 'finisher';
+  exercises: CTFinisherExercise[];
+  finalTime?: number;
+  notes?: string;
+}
+
+export type CTBloc = CTForTimeBloc | CTAmrapBloc | CTFinisherBloc;
+
+export const CT_EXERCISES = [
+  'Tractions', 'Tractions lestées', 'Push-ups', 'Burpees', 'Squats', 'Jump squat',
+  'Push press', 'Sit up', 'Fentes arrière', 'Wall ball', 'Thruster',
+  'Cross mountain climbers', 'Rameur abs', 'Snatch', 'Power clean', 'Clean', 'Deadlift',
+  'Kettlebell swing', 'Box jump', 'Double under', 'Assault bike', 'Ski erg',
+  'Rameur', 'Muscle up', 'Handstand push-up', 'Toes to bar', 'Wall walk',
+  'Dips', 'GHD sit up', 'Pistol squat', 'Bar muscle up', 'Ring dip',
+];
+
 // ── Session ────────────────────────────────────────────────────
 
 export interface Session {
@@ -119,6 +189,9 @@ export interface Session {
   machine?: string;
   // Musculation-specific
   muscuItems?: MuscuItem[];
+  // Cross-training specific
+  warmupDone?: boolean;
+  ctBlocs?: CTBloc[];
 }
 
 export const SESSION_TYPE_LABELS: Record<SessionType, string> = {

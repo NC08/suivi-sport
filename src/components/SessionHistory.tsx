@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Session, SessionType, MetricKey, CardioBloc } from '../types';
+import type { Session, SessionType, MetricKey, CardioBloc, MuscuItem, CTBloc } from '../types';
 import { SESSION_TYPE_LABELS, METRIC_UNITS } from '../types';
 import { deleteSession } from '../utils/storage';
 import { format, parseISO } from 'date-fns';
@@ -59,9 +59,17 @@ export default function SessionHistory({ sessions, onEdit, onDelete }: Props) {
             const Icon = TYPE_ICON[session.type];
             const isOpen = !!expanded[session.id];
             const isCardio = session.type === 'cardio';
+            const isMusculation = session.type === 'musculation';
+            const isCrossTraining = session.type === 'crosstraining';
             const blocCount = session.cardioBlocs?.length ?? 0;
+            const muscuItemCount = session.muscuItems?.length ?? 0;
+            const ctBlocCount = session.ctBlocs?.length ?? 0;
             const subtitle = isCardio
               ? [session.machine, blocCount ? `${blocCount} bloc${blocCount > 1 ? 's' : ''}` : null, session.totalDuration ? `${session.totalDuration} min` : null].filter(Boolean).join(' · ')
+              : isMusculation
+              ? [muscuItemCount ? `${muscuItemCount} exercice${muscuItemCount > 1 ? 's' : ''}` : null, session.totalDuration ? `${session.totalDuration} min` : null].filter(Boolean).join(' · ')
+              : isCrossTraining
+              ? [ctBlocCount ? `${ctBlocCount} bloc${ctBlocCount > 1 ? 's' : ''}` : null, session.totalDuration ? `${session.totalDuration} min` : null].filter(Boolean).join(' · ')
               : [`${session.exercises.length} exercice${session.exercises.length > 1 ? 's' : ''}`, session.totalDuration ? `${session.totalDuration} min` : null].filter(Boolean).join(' · ');
 
             return (
@@ -98,7 +106,10 @@ export default function SessionHistory({ sessions, onEdit, onDelete }: Props) {
 
                 {isOpen && (
                   <div className="border-t border-gray-100 p-4 space-y-4">
-                    {isCardio ? <CardioDetail session={session} /> : session.exercises.map(ex => <ExerciseDetail key={ex.id} exercise={ex} />)}
+                    {isCardio ? <CardioDetail session={session} />
+                      : isMusculation && session.muscuItems ? <MuscuDetail items={session.muscuItems} />
+                      : isCrossTraining ? <CTDetail session={session} />
+                      : session.exercises.map(ex => <ExerciseDetail key={ex.id} exercise={ex} />)}
                     {session.notes && <p className="text-xs text-gray-400 italic border-t border-gray-100 pt-3">{session.notes}</p>}
                   </div>
                 )}
@@ -158,6 +169,180 @@ function CardioDetail({ session }: { session: Session }) {
           ))}
         </div>
       ))}
+    </div>
+  );
+}
+
+function MuscuDetail({ items }: { items: MuscuItem[] }) {
+  return (
+    <div className="space-y-3">
+      {items.map((item, idx) => {
+        if (item.itemType === 'exercise') {
+          return (
+            <div key={item.id} className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-gray-700">{item.name}</span>
+                {item.variation && <span className="text-xs text-gray-400 italic">{item.variation}</span>}
+              </div>
+              <table className="text-xs w-full">
+                <thead>
+                  <tr className="text-gray-400">
+                    <th className="text-left pb-1 pr-2">#</th>
+                    <th className="text-right pb-1 px-2">kg</th>
+                    <th className="text-right pb-1 px-2">Reps cible</th>
+                    <th className="text-right pb-1 px-2">Reps réelles</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {item.sets.map(s => (
+                    <tr key={s.setNumber} className="border-t border-gray-50">
+                      <td className="py-1 pr-2 text-gray-400">{s.setNumber}</td>
+                      <td className="py-1 px-2 text-right">{s.weight ?? '—'}</td>
+                      <td className="py-1 px-2 text-right">{s.targetReps ?? '—'}</td>
+                      <td className={`py-1 px-2 text-right font-medium ${s.actualReps !== undefined && s.targetReps !== undefined && s.actualReps < s.targetReps ? 'text-orange-600' : 'text-gray-400'}`}>
+                        {s.actualReps !== undefined ? s.actualReps : '='}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {(item.recoveryAfter !== undefined || item.notes) && (
+                <div className="flex gap-3 text-xs text-gray-400">
+                  {item.recoveryAfter !== undefined && <span>Récup : {item.recoveryAfter} min{item.recoveryIsAvg ? ' (moy)' : ''}</span>}
+                  {item.notes && <span className="italic">{item.notes}</span>}
+                </div>
+              )}
+            </div>
+          );
+        }
+        return (
+          <div key={item.id} className="bg-violet-50 rounded-xl p-3 space-y-2">
+            <div className="flex items-center gap-2 text-xs">
+              <span className="font-bold text-violet-700">Superset {idx + 1}</span>
+              <span className="text-violet-500">{item.rounds} rounds</span>
+              {item.recoveryAfter !== undefined && <span className="text-gray-400">· récup {item.recoveryAfter} min{item.recoveryIsAvg ? ' (moy)' : ''}</span>}
+            </div>
+            {item.exercises.map((ex, ei) => (
+              <div key={ex.id} className="border-t border-violet-100 pt-2 first:border-0 first:pt-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs font-semibold text-gray-600">{ei + 1}. {ex.name}</span>
+                  {ex.variation && <span className="text-xs text-gray-400 italic">{ex.variation}</span>}
+                  {ex.weight !== undefined && <span className="text-xs text-gray-500">{ex.weight} kg</span>}
+                  {ex.targetReps !== undefined && <span className="text-xs text-gray-500">× {ex.targetReps} reps</span>}
+                </div>
+                {ex.actualRepsByRound && (
+                  <div className="flex gap-2">
+                    {ex.actualRepsByRound.map((r, ri) => (
+                      <span key={ri} className={`text-xs px-2 py-0.5 rounded-lg ${r !== undefined && ex.targetReps !== undefined && r < ex.targetReps ? 'bg-orange-100 text-orange-700' : 'bg-white text-gray-600'}`}>
+                        R{ri + 1}: {r ?? '='}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {ex.notes && <span className="text-xs text-gray-400 italic">{ex.notes}</span>}
+              </div>
+            ))}
+            {item.notes && <p className="text-xs text-gray-400 italic border-t border-violet-100 pt-2">{item.notes}</p>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function secsToMmss(secs: number): string {
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+function CTDetail({ session }: { session: Session }) {
+  const blocs: CTBloc[] = session.ctBlocs ?? [];
+  return (
+    <div className="space-y-3">
+      {session.warmupDone && <p className="text-xs text-gray-500">✓ Warm-up effectué</p>}
+      {blocs.map((bloc, bi) => {
+        if (bloc.blocType === 'forTime') {
+          return (
+            <div key={bloc.id} className="bg-amber-50 rounded-xl p-3 space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-amber-700">Bloc {bi + 1} · For Time — {bloc.exerciseName}</span>
+                {bloc.finalTime !== undefined && <span className="font-mono font-semibold text-amber-600">{secsToMmss(bloc.finalTime)}</span>}
+              </div>
+              {bloc.targetReps !== undefined && <p className="text-xs text-gray-500">Cible : {bloc.targetReps} reps</p>}
+              {bloc.breaks.length > 0 && (
+                <table className="text-xs w-full">
+                  <thead>
+                    <tr className="text-gray-400">
+                      <th className="text-left pb-1 font-medium">Break</th>
+                      <th className="text-right pb-1 font-medium">Reps</th>
+                      <th className="text-right pb-1 font-medium">Prise</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bloc.breaks.map((b, i) => (
+                      <tr key={i} className="border-t border-amber-100">
+                        <td className="py-1 text-gray-400">{i + 1}</td>
+                        <td className="py-1 text-right font-medium text-gray-700">{b.repsDone}</td>
+                        <td className="py-1 text-right text-gray-500 capitalize">{b.grip ?? '—'}</td>
+                      </tr>
+                    ))}
+                    <tr className="border-t border-amber-200">
+                      <td className="pt-1 text-gray-500 font-medium">Total</td>
+                      <td className="pt-1 text-right font-bold text-amber-700">{bloc.breaks.reduce((s, b) => s + (b.repsDone ?? 0), 0)}</td>
+                      <td />
+                    </tr>
+                  </tbody>
+                </table>
+              )}
+              {bloc.penaltyDesc && <p className="text-xs text-gray-400">Pénalité : {bloc.penaltyDesc}{bloc.penaltyRounds ? ` × ${bloc.penaltyRounds}` : ''}</p>}
+              {bloc.recoveryAfter && <p className="text-xs text-gray-400">Récup : {bloc.recoveryAfter} min</p>}
+            </div>
+          );
+        }
+        if (bloc.blocType === 'amrap') {
+          const score = bloc.roundsCompleted !== undefined
+            ? `${bloc.roundsCompleted} rounds${bloc.partialRoundExercises ? ` + ${bloc.partialRoundExercises} ex.` : ''}`
+            : null;
+          return (
+            <div key={bloc.id} className="bg-amber-50 rounded-xl p-3 space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-amber-700">Bloc {bi + 1} · AMRAP{bloc.duration ? ` ${bloc.duration} min` : ''}</span>
+                {score && <span className="font-semibold text-amber-600">{score}</span>}
+              </div>
+              <div className="space-y-1">
+                {bloc.exercises.map((ex, ei) => (
+                  <div key={ex.id} className="text-xs flex gap-2 text-gray-600">
+                    <span className="text-gray-400 shrink-0">{ei + 1}.</span>
+                    <span>{ex.targetReps ? `${ex.targetReps} reps` : ex.targetCals ? `${ex.targetCals} cal` : ''} {ex.name}</span>
+                    {ex.weight !== undefined && <span className="text-gray-400">{ex.weight} kg</span>}
+                  </div>
+                ))}
+              </div>
+              {bloc.recoveryAfter && <p className="text-xs text-gray-400">Récup : {bloc.recoveryAfter} min</p>}
+            </div>
+          );
+        }
+        return (
+          <div key={bloc.id} className="bg-amber-50 rounded-xl p-3 space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-bold text-amber-700">Bloc {bi + 1} · Finisher</span>
+              {bloc.finalTime !== undefined && <span className="font-mono font-semibold text-amber-600">{secsToMmss(bloc.finalTime)}</span>}
+            </div>
+            <div className="space-y-1">
+              {bloc.exercises.map((ex, ei) => (
+                <div key={ex.id} className="text-xs flex gap-2 items-baseline text-gray-600">
+                  <span className="text-gray-400 shrink-0">{ei + 1}.</span>
+                  {ex.targetReps !== undefined && <span className="font-medium">{ex.targetReps}×</span>}
+                  <span>{ex.name}</span>
+                  {ex.variant && <span className="text-gray-400 italic">{ex.variant}</span>}
+                  {ex.weight !== undefined && <span className="text-gray-400">{ex.weight} kg</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
