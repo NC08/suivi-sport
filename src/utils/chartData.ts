@@ -2,6 +2,21 @@ import type { Session, SessionType, MetricKey } from '../types';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
+export interface CTForTimePoint {
+  date: string;
+  rawDate: string;
+  finalTime: number; // seconds
+  sessionId: string;
+}
+
+export interface CTAmrapPoint {
+  date: string;
+  rawDate: string;
+  score: number; // rounds + partial fraction
+  roundsCompleted: number;
+  sessionId: string;
+}
+
 export interface ChartPoint {
   date: string;
   rawDate: string;
@@ -163,4 +178,90 @@ export function getExercisesForType(sessions: Session[], type: SessionType): str
     for (const e of s.exercises) names.add(e.name);
   }
   return Array.from(names).sort();
+}
+
+/** Unique exercise names from ForTime blocs across CT sessions */
+export function getCTForTimeExercises(sessions: Session[]): string[] {
+  const names = new Set<string>();
+  for (const s of sessions.filter(s => s.type === 'crosstraining')) {
+    for (const bloc of s.ctBlocs ?? []) {
+      if (bloc.blocType === 'forTime' && bloc.exerciseName.trim()) {
+        names.add(bloc.exerciseName.trim());
+      }
+    }
+  }
+  return Array.from(names).sort();
+}
+
+/** FinalTime (seconds) per session for a given ForTime exercise name */
+export function getCTForTimeProgressData(sessions: Session[], exerciseName: string): CTForTimePoint[] {
+  const filtered = sessions
+    .filter(s => s.type === 'crosstraining')
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const points: CTForTimePoint[] = [];
+  for (const session of filtered) {
+    for (const bloc of session.ctBlocs ?? []) {
+      if (
+        bloc.blocType === 'forTime' &&
+        bloc.exerciseName.toLowerCase() === exerciseName.toLowerCase() &&
+        bloc.finalTime !== undefined
+      ) {
+        points.push({
+          date: format(parseISO(session.date), 'd MMM yy', { locale: fr }),
+          rawDate: session.date,
+          finalTime: bloc.finalTime,
+          sessionId: session.id,
+        });
+        break;
+      }
+    }
+  }
+  return points;
+}
+
+/** Unique AMRAP workouts (keyed by sorted exercise names) */
+export function getCTAmrapWorkouts(sessions: Session[]): { key: string; label: string }[] {
+  const map = new Map<string, string>();
+  for (const s of sessions.filter(s => s.type === 'crosstraining')) {
+    for (const bloc of s.ctBlocs ?? []) {
+      if (bloc.blocType === 'amrap') {
+        const names = bloc.exercises.map(e => e.name.trim()).filter(Boolean);
+        if (names.length > 0) {
+          const key = names.join('|');
+          map.set(key, names.join(', '));
+        }
+      }
+    }
+  }
+  return Array.from(map.entries()).map(([key, label]) => ({ key, label }));
+}
+
+/** AMRAP score (rounds + partial fraction) per session for a given workout key */
+export function getCTAmrapProgressData(sessions: Session[], workoutKey: string): CTAmrapPoint[] {
+  const filtered = sessions
+    .filter(s => s.type === 'crosstraining')
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const points: CTAmrapPoint[] = [];
+  for (const session of filtered) {
+    for (const bloc of session.ctBlocs ?? []) {
+      if (bloc.blocType === 'amrap') {
+        const names = bloc.exercises.map(e => e.name.trim()).filter(Boolean);
+        const key = names.join('|');
+        if (key === workoutKey && bloc.roundsCompleted !== undefined) {
+          const partial = (bloc.partialRoundExercises ?? 0) / Math.max(bloc.exercises.length, 1);
+          points.push({
+            date: format(parseISO(session.date), 'd MMM yy', { locale: fr }),
+            rawDate: session.date,
+            score: bloc.roundsCompleted + partial,
+            roundsCompleted: bloc.roundsCompleted,
+            sessionId: session.id,
+          });
+          break;
+        }
+      }
+    }
+  }
+  return points;
 }
