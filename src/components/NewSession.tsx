@@ -6,6 +6,7 @@ import { Plus, Trash2, ChevronDown, ChevronUp, X } from 'lucide-react';
 import CardioForm from './CardioForm';
 import MuscuForm from './MuscuForm';
 import CrossTrainingForm, { CTExerciseDatalist } from './CrossTrainingForm';
+import HyroxForm, { HyroxExerciseDatalist } from './HyroxForm';
 import clsx from 'clsx';
 
 interface Props {
@@ -39,16 +40,18 @@ export default function NewSession({ editing, onSaved, onCancel }: Props) {
   const isCardio = type === 'cardio';
   const isMusculation = type === 'musculation';
   const isCrossTraining = type === 'crosstraining';
+  const isHyrox = type === 'hyrox';
   const metrics = SESSION_METRICS[type];
   const patch = (p: Partial<Session>) => setSession(s => ({ ...s, ...p }));
 
   const handleTypeChange = (t: SessionType) => {
     setSession(s => ({
       ...s, type: t,
-      exercises: (t === 'cardio' || t === 'musculation' || t === 'crosstraining') ? [] : [emptyExercise()],
+      exercises: (t === 'cardio' || t === 'musculation' || t === 'crosstraining' || t === 'hyrox') ? [] : [emptyExercise()],
       cardioBlocs: undefined,
       muscuItems: undefined,
       ctBlocs: undefined,
+      hyroxBlocs: undefined,
       warmupDone: undefined,
     }));
   };
@@ -84,7 +87,7 @@ export default function NewSession({ editing, onSaved, onCancel }: Props) {
       ...session,
       title: session.title || undefined,
       notes: session.notes || undefined,
-      exercises: (isCardio || isMusculation || isCrossTraining) ? [] : session.exercises.filter(e => e.name.trim()),
+      exercises: (isCardio || isMusculation || isCrossTraining || isHyrox) ? [] : session.exercises.filter(e => e.name.trim()),
     };
     editing ? updateSession(toSave) : addSession(toSave);
     onSaved();
@@ -100,6 +103,14 @@ export default function NewSession({ editing, onSaved, onCancel }: Props) {
         b.blocType === 'amrap' ? b.exercises.some(e => e.name.trim()) :
         b.blocType === 'emom' ? b.exercises.some(e => !e.isRest && e.name.trim()) :
         b.blocType === 'deathBy' ? b.blocks.length > 0 :
+        b.exercises.some(e => e.name.trim())
+      ) ?? false) || !!session.warmupDone
+    : isHyrox
+    ? (session.hyroxBlocs?.some(b =>
+        b.blocType === 'hyroxStations' ? b.stations.length > 0 :
+        b.blocType === 'partnerAmrap' ? b.p2Exercises.some(e => e.name.trim()) :
+        b.blocType === 'partnerFinisher' ? b.mainExercise.trim() !== '' :
+        b.blocType === 'forTime' ? b.exerciseName.trim() !== '' :
         b.exercises.some(e => e.name.trim())
       ) ?? false) || !!session.warmupDone
     : session.exercises.some(e => e.name.trim());
@@ -143,6 +154,7 @@ export default function NewSession({ editing, onSaved, onCancel }: Props) {
       </div>
 
       <CTExerciseDatalist />
+      <HyroxExerciseDatalist />
 
       {isCardio ? (
         <CardioForm session={session} onChange={patch} />
@@ -150,6 +162,8 @@ export default function NewSession({ editing, onSaved, onCancel }: Props) {
         <MuscuForm session={session} onChange={patch} />
       ) : isCrossTraining ? (
         <CrossTrainingForm session={session} onChange={patch} />
+      ) : isHyrox ? (
+        <HyroxForm session={session} onChange={patch} />
       ) : (
         <div className="space-y-3">
           <h2 className="text-sm font-semibold text-gray-700">Exercices ({session.exercises.length})</h2>
