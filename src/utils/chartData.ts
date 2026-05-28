@@ -137,7 +137,7 @@ export function getWeeklySessionData(sessions: Session[], weeks = 12): { week: s
 
   for (let i = weeks - 1; i >= 0; i--) {
     const weekStart = new Date(now);
-    weekStart.setDate(now.getDate() - i * 7 - now.getDay());
+    weekStart.setDate(now.getDate() - i * 7 - (now.getDay() + 6) % 7);
     weekStart.setHours(0, 0, 0, 0);
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekStart.getDate() + 6);
