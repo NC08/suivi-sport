@@ -213,6 +213,77 @@ export const CT_EXERCISES = [
   'Dips', 'GHD sit up', 'Pistol squat', 'Bar muscle up', 'Ring dip',
 ];
 
+// ── Hyrox types ────────────────────────────────────────────────
+
+export interface HyroxExercise {
+  id: string;
+  name: string;
+  target?: number;
+  unit?: 'm' | 'reps' | 'cal';
+  weight?: number;
+}
+
+export interface HyroxStation {
+  id: string;
+  exercises: HyroxExercise[];
+  trExercise?: string;
+  trReps?: number;
+  overtime?: number; // seconds over time cap; undefined = ok
+}
+
+export interface HyroxStationsBloc {
+  id: string;
+  blocType: 'hyroxStations';
+  workTimeMins: number;
+  recoveryMins: number;
+  stations: HyroxStation[];
+  notes?: string;
+}
+
+export interface HyroxPartnerAmrapExercise {
+  id: string;
+  name: string;
+  targetReps?: number;
+  targetCals?: number;
+}
+
+export interface HyroxPartnerAmrapBloc {
+  id: string;
+  blocType: 'partnerAmrap';
+  p1Exercise: string;
+  p1IsDistance?: boolean;
+  p1Total?: number;
+  p2Exercises: HyroxPartnerAmrapExercise[];
+  p2TotalRounds?: number;
+  p2PartialExercises?: number;
+  duration?: number;
+  recoveryAfter?: string;
+  notes?: string;
+}
+
+export interface HyroxPartnerFinisherBloc {
+  id: string;
+  blocType: 'partnerFinisher';
+  mainExercise: string;
+  mainTotal?: number;
+  overtime?: number; // seconds over time cap
+  penaltyDesc?: string;
+  penaltyRounds?: number;
+  duration?: number;
+  notes?: string;
+}
+
+export type HyroxBloc = HyroxStationsBloc | HyroxPartnerAmrapBloc | HyroxPartnerFinisherBloc | CTForTimeBloc | CTFinisherBloc;
+
+export const HYROX_EXERCISES = [
+  'Ski erg', 'Rameur', 'Farmer carry', 'Sled push', 'Sled pull',
+  'Sandbag lunges', 'Wall balls', 'Burpee broad jump', 'Run',
+  'Thruster', 'KB swing', 'Box jump over', 'Walking lunges',
+  'Snatch', 'DB snatch', 'Push-up hand release', 'Sit up',
+  'Cross mountain climbers', 'Air squat', 'Jumping jacks',
+  'Burpees', 'Push-ups',
+];
+
 // ── Session ────────────────────────────────────────────────────
 
 export interface Session {
@@ -234,6 +305,8 @@ export interface Session {
   // Cross-training specific
   warmupDone?: boolean;
   ctBlocs?: CTBloc[];
+  // Hyrox-specific
+  hyroxBlocs?: HyroxBloc[];
 }
 
 export const SESSION_TYPE_LABELS: Record<SessionType, string> = {
