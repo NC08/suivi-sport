@@ -148,7 +148,10 @@ export interface CTAmrapBloc {
 export interface CTFinisherExercise {
   id: string;
   name: string;
+  metric?: 'reps' | 'km' | 'cal';
   targetReps?: number;
+  targetDistance?: number; // km
+  targetCals?: number;
   weight?: number;
   variant?: string;
   notes?: string;

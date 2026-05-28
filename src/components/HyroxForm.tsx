@@ -649,6 +649,20 @@ function ForTimeBlocForm({ bloc, index, collapsed, onToggle, onUpdate, onRemove 
   );
 }
 
+function finisherQty(ex: CTFinisherExercise): number | '' {
+  const m = ex.metric ?? 'reps';
+  if (m === 'km') return ex.targetDistance ?? '';
+  if (m === 'cal') return ex.targetCals ?? '';
+  return ex.targetReps ?? '';
+}
+function finisherQtyPatch(ex: CTFinisherExercise, val: string): Partial<CTFinisherExercise> {
+  const num = val ? +val : undefined;
+  const m = ex.metric ?? 'reps';
+  if (m === 'km') return { targetDistance: num };
+  if (m === 'cal') return { targetCals: num };
+  return { targetReps: num };
+}
+
 // ── Finisher / Straight ────────────────────────────────────────
 
 function FinisherBlocForm({ bloc, index, collapsed, onToggle, onUpdate, onRemove }: {
@@ -688,7 +702,7 @@ function FinisherBlocForm({ bloc, index, collapsed, onToggle, onUpdate, onRemove
       {!collapsed && (
         <div className="p-4 space-y-3">
           <div className="flex text-xs text-gray-400 gap-2 px-1">
-            <span className="w-4 shrink-0" /><span className="w-14 shrink-0 text-center">Reps</span>
+            <span className="w-4 shrink-0" /><span className="w-28 shrink-0 text-center">Qté</span>
             <span className="flex-1">Exercice</span>
             <span className="w-20 shrink-0 text-center">Variante</span>
             <span className="w-14 shrink-0 text-center">kg</span>
@@ -697,10 +711,19 @@ function FinisherBlocForm({ bloc, index, collapsed, onToggle, onUpdate, onRemove
           {bloc.exercises.map((ex, i) => (
             <div key={ex.id} className="flex items-center gap-2">
               <span className="text-xs text-gray-400 w-4 shrink-0 text-center">{i + 1}</span>
-              <input type="number" min="0" placeholder="—"
-                value={ex.targetReps ?? ''}
-                onChange={e => updateEx(ex.id, { targetReps: e.target.value ? +e.target.value : undefined })}
-                className="input !w-14 !py-1 text-center text-sm shrink-0" />
+              <div className="flex items-center gap-1 w-28 shrink-0">
+                <input type="number" min="0" step={ex.metric === 'km' ? '0.1' : '1'} placeholder="—"
+                  value={finisherQty(ex)}
+                  onChange={e => updateEx(ex.id, finisherQtyPatch(ex, e.target.value))}
+                  className="input !w-12 !py-1 text-center text-sm" />
+                <select value={ex.metric ?? 'reps'}
+                  onChange={e => updateEx(ex.id, { metric: e.target.value as 'reps' | 'km' | 'cal' })}
+                  className="select !py-1 text-xs flex-1">
+                  <option value="reps">reps</option>
+                  <option value="km">km</option>
+                  <option value="cal">cal</option>
+                </select>
+              </div>
               <input type="text" list="hyrox-ex-list" placeholder="Exercice"
                 value={ex.name} onChange={e => updateEx(ex.id, { name: e.target.value })}
                 className="input flex-1 min-w-0" />
