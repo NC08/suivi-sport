@@ -13,8 +13,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           { href: "/coach", label: "Séances" },
           { href: "/coach/seances/new", label: "Nouvelle séance" },
           { href: "/coach/exercices", label: "Exercices" },
+          { href: "/progression", label: "Progression" },
         ]
-      : [{ href: "/seances", label: "Mes séances" }];
+      : [
+          { href: "/seances", label: "Mes séances" },
+          { href: "/progression", label: "Progression" },
+        ];
 
   return (
     <div className="min-h-screen">

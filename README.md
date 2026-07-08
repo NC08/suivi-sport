@@ -54,6 +54,7 @@ src/
   lib/
     prisma.ts           # client Prisma singleton
     domain.ts           # libellés, badges, formatage (dates, prescriptions)
+    progress.ts         # agrégats de progression (hebdo + par exercice)
   server/
     actions.ts          # server actions (validées zod + contrôle de rôle)
   components/
@@ -65,6 +66,7 @@ src/
     (app)/              # pages authentifiées (header + nav communs)
       coach/            # dashboard, nouvelle séance, détail, exercices
       seances/          # côté athlète : liste + détail/saisie
+      progression/      # graphiques d'évolution (recharts)
 ```
 
 ## Démarrer en local
@@ -115,10 +117,23 @@ Ne jamais activer cette variable en production.
 | `npm run db:seed` | seed de la bibliothèque d'exercices |
 | `npm run db:studio` | interface d'exploration de la base |
 
+## Page de progression
+
+`/progression` (athlète : ses données ; coach : sélecteur d'athlète) :
+
+- **Séances par semaine** — terminées, empilées par type, assignées non
+  réalisées en gris, ligne d'objectif à 4/semaine (+ vue tableau).
+- **RPE global moyen** et **volume total** (tonnage) par semaine.
+- **Par exercice** (sélecteur) : charge max et 1RM estimé (formule d'Epley),
+  volume par séance, temps total par séance — chaque graphique n'apparaît
+  que si la métrique existe pour l'exercice.
+
+Pour voir les graphiques avec des données réalistes en local :
+`npx tsx prisma/demo-data.ts` (10 semaines d'historique pour le compte
+athlète de dev ; remplace ses séances existantes — dev uniquement).
+
 ## Prochaines itérations
 
-- Page de progression : charge max / 1RM estimé par exercice, volume total,
-  temps sur distance, RPE moyen, régularité (4 séances/semaine).
 - Formulaires spécialisés par type de séance (blocs cardio, EMOM/AMRAP,
   stations Hyrox) — l'ancienne version localStorage (voir historique git)
   sert de référence fonctionnelle.
