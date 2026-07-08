@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import {
   createTrainingSession,
+  updateTrainingSession,
   type CreateSessionInput,
 } from "@/server/actions";
 import { BLOCK_FORMAT_LABELS, SESSION_TYPE_LABELS } from "@/lib/domain";
@@ -58,6 +59,34 @@ const emptyBlock = (): BlockRow => ({
   exercises: [emptyExercise()],
 });
 
+// Reconstruit l'état du formulaire depuis une séance existante
+// (duplication ou édition).
+function blocksFromInput(blocks: CreateSessionInput["blocks"]): BlockRow[] {
+  return blocks.map((b) => ({
+    key: nextKey++,
+    format: b.format,
+    title: b.title ?? "",
+    rounds: b.rounds?.toString() ?? "",
+    durationMin:
+      b.format !== "INTERVALS" && b.durationSec
+        ? Math.round(b.durationSec / 60).toString()
+        : "",
+    workSec: b.format === "INTERVALS" && b.durationSec ? b.durationSec.toString() : "",
+    restSec: b.restSec?.toString() ?? "",
+    notes: b.notes ?? "",
+    exercises: b.exercises.map((e) => ({
+      key: nextKey++,
+      exerciseId: e.exerciseId,
+      targetSets: e.targetSets?.toString() ?? "",
+      targetReps: e.targetReps?.toString() ?? "",
+      targetWeightKg: e.targetWeightKg?.toString() ?? "",
+      targetDurationSec: e.targetDurationSec?.toString() ?? "",
+      targetDistanceM: e.targetDistanceM?.toString() ?? "",
+      instructions: e.instructions ?? "",
+    })),
+  }));
+}
+
 function toInt(value: string): number | null {
   const n = Number.parseInt(value, 10);
   return Number.isFinite(n) && n > 0 ? n : null;
@@ -97,17 +126,25 @@ export function SessionForm({
   exercises,
   athletes,
   defaultDate,
+  initial,
+  sessionId,
 }: {
   exercises: ExerciseOption[];
   athletes: AthleteOption[];
   defaultDate: string;
+  initial?: CreateSessionInput; // pré-remplissage (duplication / édition)
+  sessionId?: string; // présent = mode édition
 }) {
-  const [title, setTitle] = useState("");
-  const [type, setType] = useState<SessionType>("MUSCULATION");
-  const [date, setDate] = useState(defaultDate);
-  const [athleteId, setAthleteId] = useState(athletes[0]?.id ?? "");
-  const [coachNotes, setCoachNotes] = useState("");
-  const [blocks, setBlocks] = useState<BlockRow[]>([emptyBlock()]);
+  const [title, setTitle] = useState(initial?.title ?? "");
+  const [type, setType] = useState<SessionType>(initial?.type ?? "MUSCULATION");
+  const [date, setDate] = useState(initial?.date ?? defaultDate);
+  const [athleteId, setAthleteId] = useState(
+    initial?.athleteId ?? athletes[0]?.id ?? "",
+  );
+  const [coachNotes, setCoachNotes] = useState(initial?.coachNotes ?? "");
+  const [blocks, setBlocks] = useState<BlockRow[]>(() =>
+    initial ? blocksFromInput(initial.blocks) : [emptyBlock()],
+  );
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -170,7 +207,9 @@ export function SessionForm({
       return;
     }
     startTransition(async () => {
-      const result = await createTrainingSession(payload);
+      const result = sessionId
+        ? await updateTrainingSession(sessionId, payload)
+        : await createTrainingSession(payload);
       if (result?.error) setError(result.error);
     });
   }
@@ -505,7 +544,11 @@ export function SessionForm({
         disabled={isPending}
         className="rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
       >
-        {isPending ? "Création…" : "Créer et assigner la séance"}
+        {isPending
+          ? "Enregistrement…"
+          : sessionId
+            ? "Enregistrer les modifications"
+            : "Créer et assigner la séance"}
       </button>
     </div>
   );

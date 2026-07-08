@@ -155,6 +155,127 @@ export async function getExerciseProgress(
   return points;
 }
 
+// ── Progression des blocs chronométrés (AMRAP, For Time, EMOM) ──
+//
+// Deux blocs sont "comparables" s'ils ont le même format et la même
+// composition (mêmes exercices, mêmes reps/distances cibles) : on ne
+// compare un temps For Time qu'à format identique.
+
+export type TimedBlockGroup = {
+  key: string;
+  format: "AMRAP" | "FOR_TIME" | "EMOM";
+  label: string; // ex : "For Time — Sled push, Wall balls, Burpees"
+  count: number; // nombre de résultats enregistrés
+};
+
+export type TimedBlockPoint = {
+  date: string;
+  label: string;
+  sessionTitle: string;
+  timeSec: number | null; // For Time
+  rounds: number | null; // AMRAP : tours complets ; EMOM : minutes réussies
+  extraReps: number | null;
+  totalReps: number | null; // AMRAP : score en répétitions totales
+  totalMinutes: number | null; // EMOM : durée prescrite
+  rpe: number | null;
+};
+
+type TimedBlock = Awaited<ReturnType<typeof fetchTimedBlocks>>[number];
+
+function fetchTimedBlocks(athleteId: string) {
+  return prisma.sessionBlock.findMany({
+    where: {
+      format: { in: ["AMRAP", "FOR_TIME", "EMOM"] },
+      session: { athleteId },
+      OR: [{ resultTimeSec: { not: null } }, { resultRounds: { not: null } }],
+    },
+    include: {
+      session: { select: { date: true, title: true } },
+      exercises: {
+        orderBy: { position: "asc" },
+        select: {
+          exerciseId: true,
+          targetReps: true,
+          targetDistanceM: true,
+          exercise: { select: { name: true } },
+        },
+      },
+    },
+    orderBy: { session: { date: "asc" } },
+  });
+}
+
+function blockKey(block: TimedBlock): string {
+  const composition = block.exercises
+    .map((e) => `${e.exerciseId}:${e.targetReps ?? ""}:${e.targetDistanceM ?? ""}`)
+    .join(",");
+  return `${block.format}|${composition}`;
+}
+
+function blockLabel(block: TimedBlock): string {
+  const names = block.exercises.map((e) => e.exercise.name).join(", ");
+  const header =
+    block.format === "FOR_TIME"
+      ? "For Time"
+      : block.format === "AMRAP"
+        ? `AMRAP ${block.durationSec ? Math.round(block.durationSec / 60) : "?"} min`
+        : `EMOM ${block.durationSec ? Math.round(block.durationSec / 60) : "?"} min`;
+  return `${header} — ${names}`;
+}
+
+export async function getTimedBlockGroups(
+  athleteId: string,
+): Promise<TimedBlockGroup[]> {
+  const blocks = await fetchTimedBlocks(athleteId);
+  const groups = new Map<string, TimedBlockGroup>();
+  for (const block of blocks) {
+    const key = blockKey(block);
+    const existing = groups.get(key);
+    if (existing) existing.count += 1;
+    else {
+      groups.set(key, {
+        key,
+        format: block.format as TimedBlockGroup["format"],
+        label: blockLabel(block),
+        count: 1,
+      });
+    }
+  }
+  return [...groups.values()].sort((a, b) => b.count - a.count);
+}
+
+export async function getTimedBlockProgress(
+  athleteId: string,
+  key: string,
+): Promise<TimedBlockPoint[]> {
+  const blocks = await fetchTimedBlocks(athleteId);
+  return blocks
+    .filter((block) => blockKey(block) === key)
+    .map((block) => {
+      const repsPerRound = block.exercises.reduce(
+        (sum, e) => sum + (e.targetReps ?? 0),
+        0,
+      );
+      return {
+        date: block.session.date.toISOString().slice(0, 10),
+        label: shortLabel(block.session.date),
+        sessionTitle: block.session.title,
+        timeSec: block.resultTimeSec,
+        rounds: block.resultRounds,
+        extraReps: block.resultExtraReps,
+        totalReps:
+          block.format === "AMRAP" && block.resultRounds !== null
+            ? block.resultRounds * repsPerRound + (block.resultExtraReps ?? 0)
+            : null,
+        totalMinutes:
+          block.format === "EMOM" && block.durationSec
+            ? Math.round(block.durationSec / 60)
+            : null,
+        rpe: block.resultRpe,
+      };
+    });
+}
+
 // Exercices ayant au moins une réalisation pour cet athlète.
 export async function getTrackedExercises(athleteId: string) {
   return prisma.exercise.findMany({

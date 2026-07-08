@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import {
@@ -51,6 +52,20 @@ export default async function CoachSessionDetail({
           className={`rounded-full px-2 py-0.5 text-xs font-medium ${SESSION_STATUS_BADGE[session.status]}`}
         >
           {SESSION_STATUS_LABELS[session.status]}
+        </span>
+        <span className="ml-auto flex gap-2">
+          <Link
+            href={`/coach/seances/${session.id}/edit`}
+            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:border-indigo-400 hover:text-indigo-700"
+          >
+            Modifier
+          </Link>
+          <Link
+            href={`/coach/seances/new?from=${session.id}`}
+            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:border-indigo-400 hover:text-indigo-700"
+          >
+            Dupliquer
+          </Link>
         </span>
       </div>
       <p className="mt-1 text-sm text-slate-500">

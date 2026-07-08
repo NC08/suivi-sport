@@ -115,6 +115,60 @@ export async function createTrainingSession(
   redirect(`/coach/seances/${created.id}`);
 }
 
+// Remplace le contenu d'une séance existante. Les blocs sont recréés :
+// les saisies déjà faites par l'athlète sur cette séance sont supprimées
+// (l'interface avertit avant).
+export async function updateTrainingSession(
+  sessionId: string,
+  input: CreateSessionInput,
+): Promise<{ error: string } | never> {
+  await requireCoach();
+  const parsed = createSessionSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Formulaire invalide" };
+  }
+  const { blocks, date, ...data } = parsed.data;
+
+  const existing = await prisma.trainingSession.findUnique({
+    where: { id: sessionId },
+  });
+  if (!existing) return { error: "Séance introuvable." };
+
+  const athlete = await prisma.user.findUnique({ where: { id: data.athleteId } });
+  if (!athlete || athlete.role !== "ATHLETE") {
+    return { error: "Athlète introuvable." };
+  }
+
+  await prisma.$transaction([
+    prisma.sessionBlock.deleteMany({ where: { sessionId } }),
+    prisma.trainingSession.update({
+      where: { id: sessionId },
+      data: {
+        title: data.title,
+        type: data.type,
+        date: new Date(date),
+        coachNotes: data.coachNotes,
+        athleteId: data.athleteId,
+        blocks: {
+          create: blocks.map(({ exercises, ...block }, blockIndex) => ({
+            ...block,
+            position: blockIndex + 1,
+            exercises: {
+              create: exercises.map((ex, index) => ({ ...ex, position: index + 1 })),
+            },
+          })),
+        },
+      },
+    }),
+  ]);
+
+  revalidatePath("/coach");
+  revalidatePath("/seances");
+  revalidatePath(`/coach/seances/${sessionId}`);
+  revalidatePath(`/seances/${sessionId}`);
+  redirect(`/coach/seances/${sessionId}`);
+}
+
 // ── Saisie des réalisations (athlète) ───────────────────────────
 
 const performanceSetSchema = z.object({

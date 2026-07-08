@@ -14,7 +14,12 @@ import {
   YAxis,
 } from "recharts";
 import type { SessionType } from "@prisma/client";
-import type { ExercisePoint, WeeklyPoint } from "@/lib/progress";
+import type {
+  ExercisePoint,
+  TimedBlockGroup,
+  TimedBlockPoint,
+  WeeklyPoint,
+} from "@/lib/progress";
 import { SESSION_TYPE_LABELS, formatDuration } from "@/lib/domain";
 
 // Palette validée (voir guide dataviz) : ordre fixe, jamais recyclé.
@@ -233,6 +238,141 @@ export function ExerciseVolumeChart({ data }: { data: ExercisePoint[] }) {
             formatter={(value) => [`${Math.round(Number(value)).toLocaleString("fr-FR")} kg`, "Volume"]}
           />
           <Bar dataKey="volumeKg" name="Volume" fill={BLUE} radius={[4, 4, 0, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </ChartCard>
+  );
+}
+
+// ── Blocs chronométrés ──────────────────────────────────────────
+
+export function TimedBlockChart({
+  format,
+  data,
+}: {
+  format: TimedBlockGroup["format"];
+  data: TimedBlockPoint[];
+}) {
+  if (format === "FOR_TIME") {
+    const rows = data.map((p) => ({
+      ...p,
+      timeMin: p.timeSec !== null ? Math.round((p.timeSec / 60) * 100) / 100 : null,
+    }));
+    return (
+      <ChartCard title="Temps" subtitle="Temps réalisé — plus bas = mieux.">
+        <ResponsiveContainer>
+          <LineChart data={rows}>
+            <CartesianGrid vertical={false} stroke={GRID} />
+            <XAxis dataKey="label" {...axisProps} />
+            <YAxis width={36} {...axisProps} />
+            <Tooltip
+              {...tooltipStyle}
+              formatter={(_value, _name, item) => {
+                const p = item.payload as (typeof rows)[number];
+                const rpe = p.rpe !== null ? ` · RPE ${p.rpe}` : "";
+                return [
+                  `${p.timeSec !== null ? formatDuration(p.timeSec) : "—"}${rpe}`,
+                  "Temps",
+                ];
+              }}
+            />
+            <Line
+              type="monotone"
+              dataKey="timeMin"
+              name="Temps (min)"
+              stroke={BLUE}
+              strokeWidth={2}
+              dot={{ r: 3, fill: BLUE, strokeWidth: 0 }}
+              activeDot={{ r: 5 }}
+              connectNulls
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </ChartCard>
+    );
+  }
+
+  if (format === "AMRAP") {
+    return (
+      <ChartCard
+        title="Score"
+        subtitle="Répétitions totales (tours × reps/tour + reps du tour entamé)."
+      >
+        <ResponsiveContainer>
+          <LineChart data={data}>
+            <CartesianGrid vertical={false} stroke={GRID} />
+            <XAxis dataKey="label" {...axisProps} />
+            <YAxis width={36} {...axisProps} />
+            <Tooltip
+              {...tooltipStyle}
+              formatter={(value, _name, item) => {
+                const p = item.payload as TimedBlockPoint;
+                const detail =
+                  p.rounds !== null
+                    ? ` (${p.rounds} tours${p.extraReps ? ` + ${p.extraReps} reps` : ""})`
+                    : "";
+                const rpe = p.rpe !== null ? ` · RPE ${p.rpe}` : "";
+                return [`${value} reps${detail}${rpe}`, "Score"];
+              }}
+            />
+            <Line
+              type="monotone"
+              dataKey="totalReps"
+              name="Reps totales"
+              stroke={BLUE}
+              strokeWidth={2}
+              dot={{ r: 3, fill: BLUE, strokeWidth: 0 }}
+              activeDot={{ r: 5 }}
+              connectNulls
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </ChartCard>
+    );
+  }
+
+  // EMOM
+  const totalMinutes = data.find((p) => p.totalMinutes !== null)?.totalMinutes ?? null;
+  return (
+    <ChartCard
+      title="Minutes réussies"
+      subtitle={totalMinutes ? `Sur ${totalMinutes} minutes prescrites.` : undefined}
+    >
+      <ResponsiveContainer>
+        <BarChart data={data} barSize={18}>
+          <CartesianGrid vertical={false} stroke={GRID} />
+          <XAxis dataKey="label" {...axisProps} />
+          <YAxis
+            allowDecimals={false}
+            width={24}
+            domain={[0, (dataMax: number) => Math.max(totalMinutes ?? 0, dataMax) + 1]}
+            {...axisProps}
+          />
+          <Tooltip
+            {...tooltipStyle}
+            formatter={(value, _name, item) => {
+              const p = item.payload as TimedBlockPoint;
+              const rpe = p.rpe !== null ? ` · RPE ${p.rpe}` : "";
+              return [
+                `${value}${p.totalMinutes ? ` / ${p.totalMinutes}` : ""} minutes${rpe}`,
+                "Réussies",
+              ];
+            }}
+          />
+          <Bar dataKey="rounds" name="Minutes réussies" fill={BLUE} radius={[4, 4, 0, 0]} />
+          {totalMinutes !== null && (
+            <ReferenceLine
+              y={totalMinutes}
+              stroke={MUTED}
+              strokeDasharray="4 4"
+              label={{
+                value: `Prescrit ${totalMinutes}`,
+                position: "insideTopRight",
+                fill: MUTED,
+                fontSize: 11,
+              }}
+            />
+          )}
         </BarChart>
       </ResponsiveContainer>
     </ChartCard>

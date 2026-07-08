@@ -3,6 +3,8 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import {
   getExerciseProgress,
+  getTimedBlockGroups,
+  getTimedBlockProgress,
   getTrackedExercises,
   getWeeklyOverview,
 } from "@/lib/progress";
@@ -11,6 +13,7 @@ import {
   ExerciseStrengthChart,
   ExerciseTimeChart,
   ExerciseVolumeChart,
+  TimedBlockChart,
   WeeklyRpeChart,
   WeeklySessionsChart,
   WeeklyVolumeChart,
@@ -21,7 +24,7 @@ import type { SessionType } from "@prisma/client";
 export default async function ProgressPage({
   searchParams,
 }: {
-  searchParams: Promise<{ athlete?: string; exercice?: string }>;
+  searchParams: Promise<{ athlete?: string; exercice?: string; bloc?: string }>;
 }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
@@ -50,10 +53,17 @@ export default async function ProgressPage({
       athletes.find((a) => a.id === params.athlete)?.id ?? athletes[0].id;
   }
 
-  const [weekly, trackedExercises] = await Promise.all([
+  const [weekly, trackedExercises, timedBlockGroups] = await Promise.all([
     getWeeklyOverview(athleteId),
     getTrackedExercises(athleteId),
+    getTimedBlockGroups(athleteId),
   ]);
+
+  const selectedBlockGroup =
+    timedBlockGroups.find((g) => g.key === params.bloc) ?? timedBlockGroups[0];
+  const timedBlockPoints = selectedBlockGroup
+    ? await getTimedBlockProgress(athleteId, selectedBlockGroup.key)
+    : [];
 
   const exerciseId =
     trackedExercises.find((e) => e.id === params.exercice)?.id ??
@@ -179,6 +189,37 @@ export default async function ProgressPage({
           </div>
         )}
       </div>
+
+      {timedBlockGroups.length > 0 && selectedBlockGroup && (
+        <div className="mt-10">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-bold tracking-tight">
+                Blocs chronométrés
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                WODs comparés à format et composition identiques (mêmes
+                exercices, mêmes cibles).
+              </p>
+            </div>
+            <ParamSelect
+              param="bloc"
+              label="Bloc"
+              value={selectedBlockGroup.key}
+              options={timedBlockGroups.map((g) => ({
+                value: g.key,
+                label: `${g.label} (${g.count})`,
+              }))}
+            />
+          </div>
+          <div className="mt-6">
+            <TimedBlockChart
+              format={selectedBlockGroup.format}
+              data={timedBlockPoints}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

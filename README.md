@@ -136,14 +136,24 @@ Ne jamais activer cette variable en production.
 - **Par exercice** (sélecteur) : charge max et 1RM estimé (formule d'Epley),
   volume par séance, temps total par séance — chaque graphique n'apparaît
   que si la métrique existe pour l'exercice.
+- **Blocs chronométrés** (sélecteur) : les WODs sont regroupés par format et
+  composition identiques (mêmes exercices, mêmes cibles) ; temps For Time
+  (plus bas = mieux), score AMRAP en répétitions totales, minutes réussies
+  d'un EMOM face au prescrit.
 
 Pour voir les graphiques avec des données réalistes en local :
 `npx tsx prisma/demo-data.ts` (10 semaines d'historique pour le compte
 athlète de dev ; remplace ses séances existantes — dev uniquement).
 
+## Duplication et édition (coach)
+
+Depuis le détail d'une séance : **Dupliquer** ouvre le formulaire de création
+pré-rempli (date du jour) ; **Modifier** édite la séance en place — les blocs
+sont remplacés, avec avertissement si l'athlète a déjà saisi des réalisations
+(elles seraient supprimées).
+
 ## Prochaines itérations
 
-- Progression sur les blocs chronométrés (temps For Time, tours AMRAP à
-  format comparable).
-- Duplication de séance, modèles de séances récurrentes.
-- Édition d'une séance déjà créée ; réouverture d'une séance terminée.
+- Déploiement en ligne (Vercel + Neon) — procédure ci-dessus.
+- Réouverture d'une séance terminée ; suppression de séance.
+- Modèles de séances récurrentes.
