@@ -1,0 +1,168 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Utilisateurs & rôles ────────────────────────────────────────
+
+enum Role {
+  COACH
+  ATHLETE
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  role          Role      @default(ATHLETE)
+  createdAt     DateTime  @default(now())
+
+  accounts         Account[]
+  sessions         Session[]
+  coachedSessions  TrainingSession[] @relation("CoachSessions")
+  assignedSessions TrainingSession[] @relation("AthleteSessions")
+  exercisesCreated Exercise[]
+}
+
+// Tables requises par Auth.js (adapter Prisma)
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ── Bibliothèque d'exercices ────────────────────────────────────
+
+model Exercise {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  category    String? // ex : "Haut du corps", "Jambes", "Station Hyrox", "Cardio"…
+  description String?
+  createdAt   DateTime @default(now())
+
+  createdBy   User?   @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdById String?
+
+  sessionExercises SessionExercise[]
+}
+
+// ── Séances ─────────────────────────────────────────────────────
+
+enum SessionType {
+  CARDIO
+  CROSSFIT
+  HYROX
+  MUSCULATION
+}
+
+enum SessionStatus {
+  ASSIGNED
+  COMPLETED
+}
+
+model TrainingSession {
+  id          String        @id @default(cuid())
+  title       String
+  type        SessionType
+  date        DateTime      @db.Date
+  status      SessionStatus @default(ASSIGNED)
+  coachNotes  String? // consignes générales du coach
+  athleteNotes String? // ressenti global de l'athlète
+  sessionRpe  Int? // RPE global de la séance (1-10)
+  completedAt DateTime?
+  createdAt   DateTime      @default(now())
+
+  coach     User   @relation("CoachSessions", fields: [coachId], references: [id])
+  coachId   String
+  athlete   User   @relation("AthleteSessions", fields: [athleteId], references: [id])
+  athleteId String
+
+  exercises SessionExercise[]
+
+  @@index([athleteId, date])
+  @@index([coachId, date])
+}
+
+// Un exercice de la bibliothèque placé dans une séance, avec la
+// prescription du coach. Toutes les cibles sont optionnelles : on ne
+// remplit que celles qui ont du sens pour le type de séance.
+model SessionExercise {
+  id       String @id @default(cuid())
+  position Int // ordre dans la séance
+
+  // Prescription (cible fixée par le coach)
+  targetSets        Int?
+  targetReps        Int?
+  targetWeightKg    Float?
+  targetDurationSec Int?
+  targetDistanceM   Float?
+  instructions      String? // texte libre (tempo, variation, allure…)
+
+  session   TrainingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId String
+  exercise  Exercise        @relation(fields: [exerciseId], references: [id])
+  exerciseId String
+
+  performanceSets PerformanceSet[]
+
+  @@unique([sessionId, position])
+  @@index([exerciseId])
+}
+
+// Réalisation de l'athlète : une ligne par série (ou par segment pour
+// le cardio). Modèle flexible : chaque métrique est optionnelle, on
+// renseigne celles qui s'appliquent (reps, charge, temps, distance, RPE).
+model PerformanceSet {
+  id        String @id @default(cuid())
+  setNumber Int
+
+  reps        Int?
+  weightKg    Float?
+  durationSec Int?
+  distanceM   Float?
+  rpe         Int? // 1-10
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  sessionExercise   SessionExercise @relation(fields: [sessionExerciseId], references: [id], onDelete: Cascade)
+  sessionExerciseId String
+
+  @@unique([sessionExerciseId, setNumber])
+}
