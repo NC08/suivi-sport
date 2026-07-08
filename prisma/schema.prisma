@@ -114,35 +114,75 @@ model TrainingSession {
   athlete   User   @relation("AthleteSessions", fields: [athleteId], references: [id])
   athleteId String
 
-  exercises SessionExercise[]
+  blocks SessionBlock[]
 
   @@index([athleteId, date])
   @@index([coachId, date])
 }
 
-// Un exercice de la bibliothèque placé dans une séance, avec la
+// Format d'un bloc de séance : détermine le formulaire de prescription
+// (coach) et de saisie (athlète).
+enum BlockFormat {
+  STANDARD // exercices en séries classiques (musculation, cardio simple)
+  SUPERSET // exercices alternés sur N tours
+  INTERVALS // fractionné : N répétitions effort/récup
+  AMRAP // max de tours dans un temps donné
+  FOR_TIME // enchaînement chronométré
+  EMOM // une consigne par minute pendant N minutes
+}
+
+// Une séance est composée de blocs ordonnés. Le bloc porte le format,
+// ses paramètres (tours, temps plafond, récupération) et — pour les
+// formats chronométrés — le résultat global saisi par l'athlète.
+model SessionBlock {
+  id       String      @id @default(cuid())
+  position Int
+  format   BlockFormat @default(STANDARD)
+  title    String? // ex : "WOD", "Finisher", "Bloc seuil"
+
+  rounds      Int? // tours (superset, For Time, intervalles)
+  durationSec Int? // temps plafond AMRAP / durée totale EMOM / effort par intervalle
+  restSec     Int? // récupération entre tours ou intervalles
+  notes       String?
+
+  // Résultat de bloc (athlète) — selon le format
+  resultTimeSec   Int? // For Time : temps total
+  resultRounds    Int? // AMRAP : tours complets ; EMOM : minutes réussies
+  resultExtraReps Int? // AMRAP : répétitions du tour entamé
+  resultRpe       Int? // 1-10
+  resultNotes     String?
+
+  session   TrainingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId String
+
+  exercises SessionExercise[]
+
+  @@unique([sessionId, position])
+}
+
+// Un exercice de la bibliothèque placé dans un bloc, avec la
 // prescription du coach. Toutes les cibles sont optionnelles : on ne
-// remplit que celles qui ont du sens pour le type de séance.
+// remplit que celles qui ont du sens pour le format du bloc.
 model SessionExercise {
   id       String @id @default(cuid())
-  position Int // ordre dans la séance
+  position Int // ordre dans le bloc
 
   // Prescription (cible fixée par le coach)
   targetSets        Int?
-  targetReps        Int?
+  targetReps        Int? // reps par série / par tour / par minute selon le format
   targetWeightKg    Float?
   targetDurationSec Int?
   targetDistanceM   Float?
   instructions      String? // texte libre (tempo, variation, allure…)
 
-  session   TrainingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  sessionId String
-  exercise  Exercise        @relation(fields: [exerciseId], references: [id])
+  block   SessionBlock @relation(fields: [blockId], references: [id], onDelete: Cascade)
+  blockId String
+  exercise   Exercise @relation(fields: [exerciseId], references: [id])
   exerciseId String
 
   performanceSets PerformanceSet[]
 
-  @@unique([sessionId, position])
+  @@unique([blockId, position])
   @@index([exerciseId])
 }
 

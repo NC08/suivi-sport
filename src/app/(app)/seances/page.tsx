@@ -18,7 +18,7 @@ export default async function AthleteSessions() {
   const sessions = await prisma.trainingSession.findMany({
     where: { athleteId: session.user.id },
     orderBy: { date: "desc" },
-    include: { _count: { select: { exercises: true } } },
+    include: { blocks: { select: { _count: { select: { exercises: true } } } } },
   });
 
   const todo = sessions.filter((s) => s.status === "ASSIGNED");
@@ -39,8 +39,11 @@ export default async function AthleteSessions() {
           </span>
         </div>
         <p className="mt-1 text-sm text-slate-500">
-          {formatDate(s.date)} · {s._count.exercises} exercice
-          {s._count.exercises > 1 ? "s" : ""}
+          {formatDate(s.date)} ·{" "}
+          {(() => {
+            const n = s.blocks.reduce((sum, b) => sum + b._count.exercises, 0);
+            return `${n} exercice${n > 1 ? "s" : ""}`;
+          })()}
         </p>
       </div>
       <span

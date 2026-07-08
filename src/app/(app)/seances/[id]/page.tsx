@@ -3,14 +3,19 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { completeSession } from "@/server/actions";
 import { PerformanceEditor } from "@/components/PerformanceEditor";
+import { BlockResultForm } from "@/components/BlockResultForm";
 import {
+  BLOCK_FORMAT_LABELS,
   SESSION_STATUS_BADGE,
   SESSION_STATUS_LABELS,
   SESSION_TYPE_BADGE,
   SESSION_TYPE_LABELS,
+  formatBlockHeader,
   formatDate,
   formatPrescription,
 } from "@/lib/domain";
+
+const TIMED_FORMATS = ["AMRAP", "FOR_TIME", "EMOM"] as const;
 
 export default async function AthleteSessionDetail({
   params,
@@ -25,11 +30,16 @@ export default async function AthleteSessionDetail({
     where: { id },
     include: {
       coach: { select: { name: true, email: true } },
-      exercises: {
+      blocks: {
         orderBy: { position: "asc" },
         include: {
-          exercise: true,
-          performanceSets: { orderBy: { setNumber: "asc" } },
+          exercises: {
+            orderBy: { position: "asc" },
+            include: {
+              exercise: true,
+              performanceSets: { orderBy: { setNumber: "asc" } },
+            },
+          },
         },
       },
     },
@@ -63,30 +73,68 @@ export default async function AthleteSessionDetail({
       )}
 
       <div className="mt-6 space-y-4">
-        {session.exercises.map((se) => (
-          <section
-            key={se.id}
-            className="rounded-xl border border-slate-200 bg-white p-4"
-          >
-            <div className="flex items-baseline justify-between gap-3">
-              <h2 className="font-semibold">
-                {se.position}. {se.exercise.name}
-              </h2>
-              <span className="text-sm font-medium text-indigo-700">
-                {formatPrescription(se) || "libre"}
-              </span>
-            </div>
-            {se.instructions && (
-              <p className="mt-1 text-sm text-slate-500">{se.instructions}</p>
-            )}
-            <PerformanceEditor
-              sessionExerciseId={se.id}
-              existingSets={se.performanceSets}
-              defaultSetCount={se.targetSets ?? 1}
-              readOnly={isCompleted}
-            />
-          </section>
-        ))}
+        {session.blocks.map((block, blockIndex) => {
+          const header = formatBlockHeader(block);
+          const isTimed = (TIMED_FORMATS as readonly string[]).includes(block.format);
+          return (
+            <section
+              key={block.id}
+              className="rounded-xl border border-slate-200 bg-white p-4"
+            >
+              <div className="flex flex-wrap items-baseline gap-2">
+                <h2 className="font-semibold">
+                  {blockIndex + 1}. {block.title ?? BLOCK_FORMAT_LABELS[block.format]}
+                </h2>
+                {header && (
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+                    {header}
+                  </span>
+                )}
+              </div>
+              {block.notes && (
+                <p className="mt-1 text-sm text-slate-500">{block.notes}</p>
+              )}
+
+              <div className="mt-3 space-y-4">
+                {block.exercises.map((se) => (
+                  <div key={se.id}>
+                    <div className="flex items-baseline justify-between gap-3">
+                      <h3 className="text-sm font-medium">{se.exercise.name}</h3>
+                      <span className="text-sm font-medium text-indigo-700">
+                        {formatPrescription(se) || "libre"}
+                      </span>
+                    </div>
+                    {se.instructions && (
+                      <p className="mt-0.5 text-sm text-slate-500">{se.instructions}</p>
+                    )}
+                    {!isTimed && (
+                      <PerformanceEditor
+                        sessionExerciseId={se.id}
+                        existingSets={se.performanceSets}
+                        defaultSetCount={se.targetSets ?? block.rounds ?? 1}
+                        readOnly={isCompleted}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {isTimed && (
+                <BlockResultForm
+                  blockId={block.id}
+                  format={block.format}
+                  existing={block}
+                  totalMinutes={
+                    block.format === "EMOM" && block.durationSec
+                      ? Math.round(block.durationSec / 60)
+                      : null
+                  }
+                  readOnly={isCompleted}
+                />
+              )}
+            </section>
+          );
+        })}
       </div>
 
       {isCompleted ? (
@@ -102,8 +150,8 @@ export default async function AthleteSessionDetail({
         >
           <h2 className="font-semibold">Terminer la séance</h2>
           <p className="text-sm text-slate-500">
-            Enregistrez d&apos;abord vos réalisations exercice par exercice, puis
-            clôturez la séance.
+            Enregistrez d&apos;abord vos réalisations bloc par bloc, puis clôturez
+            la séance.
           </p>
           <input type="hidden" name="sessionId" value={session.id} />
           <div className="mt-3 flex flex-wrap items-end gap-3">

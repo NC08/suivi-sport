@@ -1,4 +1,4 @@
-import type { SessionType, SessionStatus } from "@prisma/client";
+import type { BlockFormat, SessionType, SessionStatus } from "@prisma/client";
 
 export const SESSION_TYPE_LABELS: Record<SessionType, string> = {
   CARDIO: "Cardio",
@@ -23,6 +23,42 @@ export const SESSION_STATUS_BADGE: Record<SessionStatus, string> = {
   ASSIGNED: "bg-amber-100 text-amber-800",
   COMPLETED: "bg-emerald-100 text-emerald-800",
 };
+
+export const BLOCK_FORMAT_LABELS: Record<BlockFormat, string> = {
+  STANDARD: "Classique",
+  SUPERSET: "Superset",
+  INTERVALS: "Intervalles",
+  AMRAP: "AMRAP",
+  FOR_TIME: "For Time",
+  EMOM: "EMOM",
+};
+
+// Résume les paramètres d'un bloc en un en-tête lisible,
+// ex : "AMRAP 12 min", "Superset — 4 tours · récup 90s", "8 × 40s / 20s".
+export function formatBlockHeader(block: {
+  format: BlockFormat;
+  rounds: number | null;
+  durationSec: number | null;
+  restSec: number | null;
+}): string {
+  const rest = block.restSec ? ` · récup ${formatDuration(block.restSec)}` : "";
+  switch (block.format) {
+    case "SUPERSET":
+      return `Superset — ${block.rounds ?? "?"} tours${rest}`;
+    case "INTERVALS":
+      return `${block.rounds ?? "?"} × ${
+        block.durationSec ? formatDuration(block.durationSec) : "?"
+      }${block.restSec ? ` / ${formatDuration(block.restSec)}` : ""}`;
+    case "AMRAP":
+      return `AMRAP ${block.durationSec ? formatDuration(block.durationSec) : "?"}`;
+    case "FOR_TIME":
+      return `For Time${block.rounds ? ` — ${block.rounds} tours` : ""}${rest}`;
+    case "EMOM":
+      return `EMOM ${block.durationSec ? formatDuration(block.durationSec) : "?"}`;
+    default:
+      return "";
+  }
+}
 
 export function formatDate(date: Date): string {
   return new Intl.DateTimeFormat("fr-FR", {

@@ -22,22 +22,30 @@ User (role: COACH | ATHLETE)
  └─ assignedSessions ───┤
                         ▼
 TrainingSession (title, type, date, status, coachNotes, athleteNotes, sessionRpe)
- └─ exercises : SessionExercise (position + prescription du coach :
-                targetSets/Reps/WeightKg/DurationSec/DistanceM, instructions)
-      ├─ exercise : Exercise (bibliothèque réutilisable — name unique, category)
-      └─ performanceSets : PerformanceSet (réalisation de l'athlète, une ligne
-                           par série : reps, weightKg, durationSec, distanceM,
-                           rpe, notes — toutes optionnelles)
+ └─ blocks : SessionBlock (position, format, rounds, durationSec, restSec,
+             notes + résultat de bloc : resultTimeSec/Rounds/ExtraReps/Rpe/Notes)
+      └─ exercises : SessionExercise (position + prescription du coach :
+                     targetSets/Reps/WeightKg/DurationSec/DistanceM, instructions)
+           ├─ exercise : Exercise (bibliothèque réutilisable — name unique, category)
+           └─ performanceSets : PerformanceSet (réalisation de l'athlète, une ligne
+                                par série : reps, weightKg, durationSec, distanceM,
+                                rpe, notes — toutes optionnelles)
 ```
 
 Principes :
 
+- **Blocs typés** : une séance se compose de blocs dont le `format` détermine
+  le formulaire de prescription et de saisie — `STANDARD` (séries classiques),
+  `SUPERSET` (exercices alternés sur N tours), `INTERVALS` (fractionné
+  effort/récup), `AMRAP`, `FOR_TIME`, `EMOM`. Les formats chronométrés portent
+  leur résultat sur le bloc (temps, tours + reps, minutes réussies) ; les
+  autres se saisissent série par série (`PerformanceSet`).
 - **Bibliothèque d'exercices** : `Exercise` est unique et référencé par
   `SessionExercise` ; un même exercice apparaît dans autant de séances que
   nécessaire sans duplication — la progression se calcule par `exerciseId`.
 - **Métriques flexibles** : prescription et réalisation portent les mêmes
   métriques optionnelles (répétitions, charge, temps, distance, RPE) ; on ne
-  renseigne que celles qui ont du sens pour le type de séance. Les colonnes
+  renseigne que celles qui ont du sens pour le format du bloc. Les colonnes
   restent typées et requêtables pour les graphiques de progression.
 - Les tables `Account`, `Session`, `VerificationToken` sont celles d'Auth.js.
 
@@ -58,8 +66,9 @@ src/
   server/
     actions.ts          # server actions (validées zod + contrôle de rôle)
   components/
-    SessionForm.tsx     # création/assignation de séance (client)
+    SessionForm.tsx     # constructeur de séance par blocs (client)
     PerformanceEditor.tsx # saisie des séries réalisées (client)
+    BlockResultForm.tsx # résultat d'un bloc AMRAP / For Time / EMOM (client)
   app/
     login/              # page de connexion (Google + connexion dev)
     api/auth/[...nextauth]/
@@ -134,7 +143,7 @@ athlète de dev ; remplace ses séances existantes — dev uniquement).
 
 ## Prochaines itérations
 
-- Formulaires spécialisés par type de séance (blocs cardio, EMOM/AMRAP,
-  stations Hyrox) — l'ancienne version localStorage (voir historique git)
-  sert de référence fonctionnelle.
+- Progression sur les blocs chronométrés (temps For Time, tours AMRAP à
+  format comparable).
 - Duplication de séance, modèles de séances récurrentes.
+- Édition d'une séance déjà créée ; réouverture d'une séance terminée.

@@ -52,13 +52,25 @@ const sessionExerciseSchema = z.object({
   instructions: z.string().trim().max(500).nullable(),
 });
 
+const blockSchema = z.object({
+  format: z.enum(["STANDARD", "SUPERSET", "INTERVALS", "AMRAP", "FOR_TIME", "EMOM"]),
+  title: z.string().trim().max(100).nullable(),
+  rounds: z.number().int().positive().nullable(),
+  durationSec: z.number().int().positive().nullable(),
+  restSec: z.number().int().positive().nullable(),
+  notes: z.string().trim().max(1000).nullable(),
+  exercises: z
+    .array(sessionExerciseSchema)
+    .min(1, "Chaque bloc doit contenir au moins un exercice"),
+});
+
 const createSessionSchema = z.object({
   title: z.string().trim().min(2, "Titre requis"),
   type: z.enum(["CARDIO", "CROSSFIT", "HYROX", "MUSCULATION"]),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date invalide"),
   athleteId: z.string().min(1, "Athlète requis"),
   coachNotes: z.string().trim().max(2000).nullable(),
-  exercises: z.array(sessionExerciseSchema).min(1, "Ajoutez au moins un exercice"),
+  blocks: z.array(blockSchema).min(1, "Ajoutez au moins un bloc"),
 });
 
 export type CreateSessionInput = z.infer<typeof createSessionSchema>;
@@ -71,7 +83,7 @@ export async function createTrainingSession(
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Formulaire invalide" };
   }
-  const { exercises, date, ...data } = parsed.data;
+  const { blocks, date, ...data } = parsed.data;
 
   const athlete = await prisma.user.findUnique({ where: { id: data.athleteId } });
   if (!athlete || athlete.role !== "ATHLETE") {
@@ -86,8 +98,14 @@ export async function createTrainingSession(
       coachNotes: data.coachNotes,
       coachId: coach.id,
       athleteId: data.athleteId,
-      exercises: {
-        create: exercises.map((ex, index) => ({ ...ex, position: index + 1 })),
+      blocks: {
+        create: blocks.map(({ exercises, ...block }, blockIndex) => ({
+          ...block,
+          position: blockIndex + 1,
+          exercises: {
+            create: exercises.map((ex, index) => ({ ...ex, position: index + 1 })),
+          },
+        })),
       },
     },
   });
@@ -120,9 +138,9 @@ export async function savePerformance(
 
   const sessionExercise = await prisma.sessionExercise.findUnique({
     where: { id: sessionExerciseId },
-    include: { session: true },
+    include: { block: { include: { session: true } } },
   });
-  if (!sessionExercise || sessionExercise.session.athleteId !== user.id) {
+  if (!sessionExercise || sessionExercise.block.session.athleteId !== user.id) {
     return { error: "Séance introuvable." };
   }
 
@@ -148,8 +166,42 @@ export async function savePerformance(
     }),
   ]);
 
-  revalidatePath(`/seances/${sessionExercise.sessionId}`);
-  revalidatePath(`/coach/seances/${sessionExercise.sessionId}`);
+  revalidatePath(`/seances/${sessionExercise.block.sessionId}`);
+  revalidatePath(`/coach/seances/${sessionExercise.block.sessionId}`);
+  return { ok: true };
+}
+
+// Résultat global d'un bloc chronométré (AMRAP, For Time, EMOM).
+const blockResultSchema = z.object({
+  resultTimeSec: z.number().int().min(0).nullable(),
+  resultRounds: z.number().int().min(0).nullable(),
+  resultExtraReps: z.number().int().min(0).nullable(),
+  resultRpe: z.number().int().min(1).max(10).nullable(),
+  resultNotes: z.string().trim().max(1000).nullable(),
+});
+
+export type BlockResultInput = z.infer<typeof blockResultSchema>;
+
+export async function saveBlockResult(
+  blockId: string,
+  result: BlockResultInput,
+): Promise<{ error?: string; ok?: boolean }> {
+  const user = await requireUser();
+  const parsed = blockResultSchema.safeParse(result);
+  if (!parsed.success) return { error: "Saisie invalide." };
+
+  const block = await prisma.sessionBlock.findUnique({
+    where: { id: blockId },
+    include: { session: true },
+  });
+  if (!block || block.session.athleteId !== user.id) {
+    return { error: "Séance introuvable." };
+  }
+
+  await prisma.sessionBlock.update({ where: { id: blockId }, data: parsed.data });
+
+  revalidatePath(`/seances/${block.sessionId}`);
+  revalidatePath(`/coach/seances/${block.sessionId}`);
   return { ok: true };
 }
 

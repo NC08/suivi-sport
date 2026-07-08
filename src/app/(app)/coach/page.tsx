@@ -13,7 +13,7 @@ export default async function CoachDashboard() {
     orderBy: { date: "desc" },
     include: {
       athlete: { select: { name: true, email: true } },
-      _count: { select: { exercises: true } },
+      blocks: { select: { _count: { select: { exercises: true } } } },
     },
   });
 
@@ -52,7 +52,10 @@ export default async function CoachDashboard() {
                   </div>
                   <p className="mt-1 text-sm text-slate-500">
                     {formatDate(s.date)} · {s.athlete.name ?? s.athlete.email} ·{" "}
-                    {s._count.exercises} exercice{s._count.exercises > 1 ? "s" : ""}
+                    {(() => {
+                      const n = s.blocks.reduce((sum, b) => sum + b._count.exercises, 0);
+                      return `${n} exercice${n > 1 ? "s" : ""}`;
+                    })()}
                   </p>
                 </div>
                 <span

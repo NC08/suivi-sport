@@ -37,8 +37,12 @@ export async function getWeeklyOverview(
   const sessions = await prisma.trainingSession.findMany({
     where: { athleteId, date: { gte: firstMonday } },
     include: {
-      exercises: {
-        select: { performanceSets: { select: { reps: true, weightKg: true } } },
+      blocks: {
+        select: {
+          exercises: {
+            select: { performanceSets: { select: { reps: true, weightKg: true } } },
+          },
+        },
       },
     },
   });
@@ -73,7 +77,7 @@ export async function getWeeklyOverview(
     } else {
       week.notCompleted += 1;
     }
-    for (const exercise of session.exercises) {
+    for (const exercise of session.blocks.flatMap((b) => b.exercises)) {
       for (const set of exercise.performanceSets) {
         if (set.reps && set.weightKg) week.volumeKg += set.reps * set.weightKg;
       }
@@ -104,12 +108,12 @@ export async function getExerciseProgress(
   exerciseId: string,
 ): Promise<ExercisePoint[]> {
   const occurrences = await prisma.sessionExercise.findMany({
-    where: { exerciseId, session: { athleteId } },
+    where: { exerciseId, block: { session: { athleteId } } },
     include: {
-      session: { select: { date: true, title: true } },
+      block: { select: { session: { select: { date: true, title: true } } } },
       performanceSets: true,
     },
-    orderBy: { session: { date: "asc" } },
+    orderBy: { block: { session: { date: "asc" } } },
   });
 
   const points: ExercisePoint[] = [];
@@ -138,9 +142,9 @@ export async function getExerciseProgress(
     }
 
     points.push({
-      date: occurrence.session.date.toISOString().slice(0, 10),
-      label: shortLabel(occurrence.session.date),
-      sessionTitle: occurrence.session.title,
+      date: occurrence.block.session.date.toISOString().slice(0, 10),
+      label: shortLabel(occurrence.block.session.date),
+      sessionTitle: occurrence.block.session.title,
       maxWeightKg: maxWeight,
       e1rmKg: e1rm,
       volumeKg: volume,
@@ -156,7 +160,7 @@ export async function getTrackedExercises(athleteId: string) {
   return prisma.exercise.findMany({
     where: {
       sessionExercises: {
-        some: { session: { athleteId }, performanceSets: { some: {} } },
+        some: { block: { session: { athleteId } }, performanceSets: { some: {} } },
       },
     },
     orderBy: [{ category: "asc" }, { name: "asc" }],
