@@ -1,11 +1,9 @@
 import { redirect } from "next/navigation";
-import { auth, signIn } from "@/auth";
+import { auth, devLoginEnabled, signIn } from "@/auth";
 
 export default async function LoginPage() {
   const session = await auth();
   if (session?.user) redirect("/");
-
-  const devLoginEnabled = process.env.AUTH_DEV_LOGIN === "true";
 
   return (
     <main className="flex min-h-screen items-center justify-center p-6">

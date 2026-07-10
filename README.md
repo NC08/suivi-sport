@@ -107,12 +107,11 @@ Ne jamais activer cette variable en production.
 
 ## Déploiement (Vercel + Neon)
 
-1. Créer une base sur [neon.tech](https://neon.tech) et récupérer `DATABASE_URL`.
-2. Importer le repo sur [vercel.com](https://vercel.com), renseigner les
-   variables d'environnement ci-dessus (`AUTH_DEV_LOGIN` absent ou `false`).
-3. Appliquer le schéma : `npm run db:deploy && npm run db:seed` (en local,
-   avec `DATABASE_URL` pointant sur Neon).
-4. Déclarer l'URL Vercel en redirect URI du client Google OAuth.
+Guide pas-à-pas complet dans **[DEPLOY.md](DEPLOY.md)** (Neon, client Google
+OAuth, variables Vercel, seed, dépannage). En résumé : le script
+`vercel-build` applique les migrations Prisma à chaque déploiement, la
+connexion dev est automatiquement désactivée sur Vercel, et `AUTH_URL` est
+détectée — il n'y a que les six variables d'environnement à renseigner.
 
 ## Scripts
 

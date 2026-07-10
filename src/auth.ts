@@ -14,7 +14,9 @@ function emailList(env: string | undefined): string[] {
 
 const allowedEmails = emailList(process.env.ALLOWED_EMAILS);
 const coachEmails = emailList(process.env.COACH_EMAILS);
-const devLoginEnabled = process.env.AUTH_DEV_LOGIN === "true";
+// Connexion dev : jamais active sur Vercel, même si la variable traîne.
+export const devLoginEnabled =
+  process.env.AUTH_DEV_LOGIN === "true" && !process.env.VERCEL;
 
 // Provider de développement : connexion en un clic en tant que coach ou
 // athlète, sans OAuth. Jamais actif si AUTH_DEV_LOGIN n'est pas "true".

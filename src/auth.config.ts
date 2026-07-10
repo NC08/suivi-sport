@@ -6,6 +6,7 @@ import type { NextAuthConfig } from "next-auth";
 export const authConfig = {
   pages: { signIn: "/login" },
   session: { strategy: "jwt" },
+  trustHost: true, // derrière le proxy Vercel, l'hôte de la requête fait foi
   providers: [],
   callbacks: {
     session({ session, token }) {
